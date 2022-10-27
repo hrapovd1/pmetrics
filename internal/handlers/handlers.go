@@ -8,6 +8,11 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
 
+const (
+	metricName = 2
+	metricVal  = 3
+)
+
 type MetricStorage struct {
 	Storage storage.Repository
 }
@@ -28,8 +33,8 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	metricKey := splitedPath[2]
-	metricValue, err := storage.StrToGauge(splitedPath[3])
+	metricKey := splitedPath[metricName]
+	metricValue, err := storage.StrToGauge(splitedPath[metricVal])
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return

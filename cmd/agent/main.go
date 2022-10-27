@@ -52,17 +52,20 @@ func reportClient(client *http.Client, url string, logger *log.Logger) {
 	data := []byte("")
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
-		logger.Fatal("Error reading request. ", err)
+		logger.Print("Error reading request. ", err)
+		return
 	}
 	req.Header.Set("Content-Type", "text/plain")
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Fatal("Error reading response. ", err)
+		logger.Print("Error reading response. ", err)
+		return
 	}
 	defer resp.Body.Close()
 	_, err = io.Copy(io.Discard, resp.Body)
 	if err != nil {
-		logger.Fatal("Error reading body. ", err)
+		logger.Print("Error reading body. ", err)
+		return
 	}
 }
 

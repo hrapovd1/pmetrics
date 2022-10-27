@@ -6,8 +6,8 @@ type gauge float64
 type counter int64
 
 type Repository interface {
-	Rewrite(key string, value interface{})
-	Append(value interface{})
+	Rewrite(key string, value gauge)
+	Append(value counter)
 }
 
 type MemStorage struct {
@@ -15,12 +15,12 @@ type MemStorage struct {
 	CounterBuff []counter
 }
 
-func (ms *MemStorage) Rewrite(key string, value interface{}) {
-	ms.GaugeBuff[key] = value.(gauge)
+func (ms *MemStorage) Rewrite(key string, value gauge) {
+	ms.GaugeBuff[key] = value
 }
 
-func (ms *MemStorage) Append(value interface{}) {
-	ms.CounterBuff = append(ms.CounterBuff, value.(counter))
+func (ms *MemStorage) Append(value counter) {
+	ms.CounterBuff = append(ms.CounterBuff, value)
 }
 
 func NewMemStorage() *MemStorage {
