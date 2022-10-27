@@ -22,10 +22,35 @@ const (
 type gauge float64
 type counter int64
 
-func reportClient(client *http.Client, metric string, logger *log.Logger) {
-	serverURL := "http://" + serverAddress + ":" + serverPort + "/update" + metric
+func main() {
+	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
+	pollTick := time.NewTicker(pollInterval)
+	reportTick := time.NewTicker(reportInterval)
+	httpClient := &http.Client{}
+	PollCount := counter(0)
+	metrics := make(map[string]gauge, 28)
+
+	logger.Println("started")
+	defer logger.Println("stopped")
+	for {
+		select {
+		case <-pollTick.C:
+			PollCount++
+			pollMetrics(metrics)
+		case <-reportTick.C:
+			for k, v := range metrics {
+				metricURL := fmt.Sprint("http://", serverAddress, ":", serverPort, "/update/gauge/", k, "/", v)
+				reportClient(httpClient, metricURL, logger)
+			}
+			metricURL := fmt.Sprint("http://", serverAddress, ":", serverPort, "/update/counter/PollCount/", PollCount)
+			reportClient(httpClient, metricURL, logger)
+		}
+	}
+}
+
+func reportClient(client *http.Client, url string, logger *log.Logger) {
 	data := []byte("")
-	req, err := http.NewRequest(http.MethodPost, serverURL, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
 		logger.Fatal("Error reading request. ", err)
 	}
@@ -72,30 +97,4 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["NumForcedGC"] = gauge(rtm.NumForcedGC)
 	metrics["GCCPUFraction"] = gauge(rtm.GCCPUFraction)
 	metrics["RandomValue"] = gauge(rand.Float64())
-}
-
-func main() {
-	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
-	pollTick := time.NewTicker(pollInterval)
-	reportTick := time.NewTicker(reportInterval)
-	httpClient := &http.Client{}
-	PollCount := counter(0)
-	metrics := make(map[string]gauge, 28)
-
-	logger.Println("started")
-	defer logger.Println("stopped")
-	for {
-		select {
-		case <-pollTick.C:
-			PollCount++
-			pollMetrics(metrics)
-		case <-reportTick.C:
-			for k, v := range metrics {
-				metric := fmt.Sprint("/gauge/", k, "/", v)
-				reportClient(httpClient, metric, logger)
-			}
-			metric := fmt.Sprint("/counter/PollCount/", PollCount)
-			reportClient(httpClient, metric, logger)
-		}
-	}
 }
