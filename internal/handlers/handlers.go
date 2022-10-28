@@ -22,10 +22,6 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
 	}
-	if r.Header.Get("Content-Type") != "text/plain" {
-		http.Error(rw, "Content-type must be text/plain", http.StatusUnsupportedMediaType)
-		return
-	}
 	_, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -52,10 +48,6 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
-		return
-	}
-	if r.Header.Get("Content-Type") != "text/plain" {
-		http.Error(rw, "Content-type must be text/plain", http.StatusUnsupportedMediaType)
 		return
 	}
 	_, err := io.ReadAll(r.Body)

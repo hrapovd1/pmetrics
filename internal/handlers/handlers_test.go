@@ -49,15 +49,6 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 			statusCode:  http.StatusMethodNotAllowed,
 		},
 		{
-			name:        "Wrong Content",
-			path:        "/update/gauge/Alloc/0",
-			method:      http.MethodPost,
-			contentType: "",
-			metric:      "Alloc",
-			want:        float64(0.0),
-			statusCode:  http.StatusUnsupportedMediaType,
-		},
-		{
 			name:        "Wrong URL",
 			path:        "/update/gauge/Alloc/a",
 			method:      http.MethodPost,
@@ -130,14 +121,6 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			contentType: "text/plain",
 			want:        int64(1),
 			statusCode:  http.StatusMethodNotAllowed,
-		},
-		{
-			name:        "Wrong Content",
-			path:        "/update/counter/PollCount/1",
-			method:      http.MethodPost,
-			contentType: "",
-			want:        int64(1),
-			statusCode:  http.StatusUnsupportedMediaType,
 		},
 		{
 			name:        "Wrong URL",
