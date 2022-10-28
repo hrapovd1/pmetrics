@@ -12,14 +12,14 @@ import (
 )
 
 func Test_pollMetrics(t *testing.T) {
-	test_metrics := make(map[string]gauge)
+	testMetrics := make(map[string]gauge)
 	test := struct {
 		name string
 		args map[string]gauge
 		want []string
 	}{
 		name: "Check metric names",
-		args: test_metrics,
+		args: testMetrics,
 		want: []string{
 			"Alloc",
 			"TotalAlloc",

@@ -81,6 +81,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 		hndl.ServeHTTP(rec, reqst)
 
 		t.Run(test.name, func(t *testing.T) {
+			defer rec.Result().Body.Close()
 			if test.statusCode == http.StatusOK {
 				assert.Equal(t, test.want, float64(locStorage.GaugeBuff[test.metric]))
 			} else {
