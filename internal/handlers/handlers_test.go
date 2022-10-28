@@ -80,9 +80,9 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 		hndl := http.HandlerFunc(ms.GaugeHandler)
 		// qeury server
 		hndl.ServeHTTP(rec, reqst)
-		result := rec.Result()
 
 		t.Run(test.name, func(t *testing.T) {
+			result := rec.Result()
 			defer result.Body.Close()
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
@@ -161,9 +161,9 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		hndl := http.HandlerFunc(ms.CounterHandler)
 		// qeury server
 		hndl.ServeHTTP(rec, reqst)
-		result := rec.Result()
 
 		t.Run(test.name, func(t *testing.T) {
+			result := rec.Result()
 			defer result.Body.Close()
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
