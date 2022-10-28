@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -79,13 +80,16 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 		hndl := http.HandlerFunc(ms.GaugeHandler)
 		// qeury server
 		hndl.ServeHTTP(rec, reqst)
+		result := rec.Result()
 
 		t.Run(test.name, func(t *testing.T) {
-			defer rec.Result().Body.Close()
+			defer result.Body.Close()
+			_, err := io.ReadAll(result.Body)
+			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
 				assert.Equal(t, test.want, float64(locStorage.GaugeBuff[test.metric]))
 			} else {
-				assert.Equal(t, test.statusCode, rec.Result().StatusCode)
+				assert.Equal(t, test.statusCode, result.StatusCode)
 			}
 		})
 	}
@@ -157,14 +161,18 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		hndl := http.HandlerFunc(ms.CounterHandler)
 		// qeury server
 		hndl.ServeHTTP(rec, reqst)
+		result := rec.Result()
 
 		t.Run(test.name, func(t *testing.T) {
+			defer result.Body.Close()
+			_, err := io.ReadAll(result.Body)
+			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
 				require.NotZero(t, len(locStorage.CounterBuff))
 				last := len(locStorage.CounterBuff) - 1
 				assert.Equal(t, test.want, int64(locStorage.CounterBuff[last]))
 			} else {
-				assert.Equal(t, test.statusCode, rec.Result().StatusCode)
+				assert.Equal(t, test.statusCode, result.StatusCode)
 			}
 		})
 	}
