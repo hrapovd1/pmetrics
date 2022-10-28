@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	metricName = 2
-	metricVal  = 3
+	metricName = 3
+	metricVal  = 4
 )
 
 type MetricStorage struct {
 	Storage storage.Repository
 }
 
-func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
+func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -49,7 +49,7 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
+func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -65,7 +65,7 @@ func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	metricValue, err := storage.StrToCounter(splitedPath[3])
+	metricValue, err := storage.StrToCounter(splitedPath[metricVal])
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
