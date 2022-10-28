@@ -12,7 +12,6 @@ const (
 	metricName = 3
 	metricVal  = 4
 	minPathLen = 5
-	maxPathLen = 6
 )
 
 type MetricStorage struct {
@@ -31,10 +30,11 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	if maxPathLen < len(splitedPath) || len(splitedPath) < minPathLen {
+	if len(splitedPath) < minPathLen {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
+
 	metricKey := splitedPath[metricName]
 	metricValue, err := storage.StrToGauge(splitedPath[metricVal])
 	if err != nil {
@@ -63,7 +63,7 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	if maxPathLen < len(splitedPath) || len(splitedPath) < minPathLen {
+	if len(splitedPath) < minPathLen {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
