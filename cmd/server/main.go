@@ -23,6 +23,7 @@ func main() {
 
 	http.HandleFunc("/update/gauge/", hanlersStorage.GaugeHandler)
 	http.HandleFunc("/update/counter/", hanlersStorage.CounterHandler)
+	http.Handle("/", http.NotFoundHandler())
 	log.Println("Server start on ", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, nil))
 }
