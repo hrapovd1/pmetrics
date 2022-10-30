@@ -82,12 +82,13 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	metricKey := splitedPath[metricName]
+	metricValue, err := storage.StrToCounter(splitedPath[metricVal])
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if metricKey == "PollCount" {
-		metricValue, err := storage.StrToCounter(splitedPath[metricVal])
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusBadRequest)
-			return
-		}
 		ms.Storage.Append(metricValue)
 	}
 
