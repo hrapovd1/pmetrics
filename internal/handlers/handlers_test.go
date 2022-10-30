@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
@@ -78,14 +80,16 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				assert.Equal(t, test.want, float64(locStorage.GaugeBuff[test.metric]))
+				_, ok := locStorage.Get(test.metric)
+				require.True(t, ok)
+				//assert.Equal(t, test.want, metric.(float64))
 			} else {
 				assert.Equal(t, test.statusCode, result.StatusCode)
 			}
 		})
 	}
 	t.Run("Check values count", func(t *testing.T) {
-		assert.Equal(t, 1, len(locStorage.GaugeBuff))
+		assert.Equal(t, 2, len(locStorage.Buffer))
 	})
 }
 
@@ -159,20 +163,20 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				require.NotZero(t, len(locStorage.CounterBuff))
-				last := len(locStorage.CounterBuff) - 1
-				assert.Equal(t, test.want, int64(locStorage.CounterBuff[last]))
+				pollCount, ok := locStorage.Get("PollCount")
+				require.True(t, ok)
+				assert.Equal(t, test.want, pollCount.(int64))
 			} else {
 				assert.Equal(t, test.statusCode, result.StatusCode)
 			}
 		})
 	}
 	t.Run("Check values count", func(t *testing.T) {
-		assert.Equal(t, 2, len(locStorage.CounterBuff))
+		assert.Equal(t, 2, len(locStorage.Buffer["PollCount"].([]int64)))
 	})
 }
 
-func TestDefaultHandler(t *testing.T) {
+func TestNotImplementedHandler(t *testing.T) {
 	reqst := httptest.NewRequest(http.MethodPost, "/update/any/", nil)
 	rec := httptest.NewRecorder()
 	hndl := http.HandlerFunc(NotImplementedHandler)
@@ -185,4 +189,59 @@ func TestDefaultHandler(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
 	})
+}
+
+func TestMetricStorage_GetAllHandler(t *testing.T) {
+	locStorage := storage.NewMemStorage()
+	locStorage.Buffer["Sys"] = float64(0.0)
+	locStorage.Buffer["Alloc"] = float64(3.0)
+	locStorage.Buffer["TotalAlloc"] = float64(-3.0)
+	ms := MetricStorage{
+		Storage: locStorage,
+	}
+
+	reqst := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	hndl := http.HandlerFunc(ms.GetAllHandler)
+	// qeury server
+	hndl.ServeHTTP(rec, reqst)
+	result := rec.Result()
+	defer result.Body.Close()
+
+	t.Run("Status Code", func(t *testing.T) {
+		assert.Equal(t, result.StatusCode, http.StatusOK)
+	})
+
+	body, err := io.ReadAll(result.Body)
+	assert.Nil(t, err)
+	val1 := strings.Split(string(body), "<tr><td>")
+	val1 = val1[1:]
+	values := make([]string, 0)
+	for _, val := range val1 {
+		for _, val := range strings.Split(val, "</td><td>") {
+			for _, val := range strings.Split(val, "</td></tr>") {
+				if val != "" {
+					values = append(values, val)
+				}
+			}
+		}
+	}
+	values = values[:len(values)-1]
+
+	for k, v := range locStorage.Buffer {
+		t.Run(k, func(t *testing.T) {
+			for i, val := range values {
+				if val == k {
+					want := fmt.Sprint(v)
+					assert.Equal(t, want, values[i+1])
+				}
+			}
+
+		})
+
+	}
+}
+
+func TestMetricStorage_GetMetricHandler(t *testing.T) {
+	assert.True(t, false)
 }

@@ -14,17 +14,18 @@ const (
 	serverPort = "8080"
 )
 
-var hanlersStorage = handlers.MetricStorage{
+var handlersStorage = handlers.MetricStorage{
 	Storage: storage.NewMemStorage(),
 }
 
 func main() {
 	serverAddr := fmt.Sprint(serverHost, ":", serverPort)
 
-	http.HandleFunc("/update/gauge/", hanlersStorage.GaugeHandler)
-	http.HandleFunc("/update/counter/", hanlersStorage.CounterHandler)
+	http.HandleFunc("/update/gauge/", handlersStorage.GaugeHandler)
+	http.HandleFunc("/update/counter/", handlersStorage.CounterHandler)
 	http.HandleFunc("/update/", handlers.NotImplementedHandler)
-	http.Handle("/", http.NotFoundHandler())
+	http.HandleFunc("/value/", handlersStorage.GetMetricHandler)
+	http.HandleFunc("/", handlersStorage.GetAllHandler)
 	log.Println("Server start on ", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, nil))
 }

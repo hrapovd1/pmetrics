@@ -1,32 +1,68 @@
 package storage
 
-import "strconv"
+import (
+	"strconv"
+)
 
 type gauge float64
 type counter int64
 
 type Repository interface {
-	Rewrite(key string, value gauge)
 	Append(value counter)
+	Get(key string) (interface{}, bool)
+	GetAll() map[string]interface{}
+	Rewrite(key string, value gauge)
 }
 
 type MemStorage struct {
-	GaugeBuff   map[string]gauge
-	CounterBuff []counter
-}
-
-func (ms *MemStorage) Rewrite(key string, value gauge) {
-	ms.GaugeBuff[key] = value
+	Buffer map[string]interface{}
 }
 
 func (ms *MemStorage) Append(value counter) {
-	ms.CounterBuff = append(ms.CounterBuff, value)
+	ms.Buffer["PollCount"] = append(
+		ms.Buffer["PollCount"].([]int64),
+		int64(value),
+	)
+}
+
+func (ms *MemStorage) Get(key string) (interface{}, bool) {
+	switch key {
+	case "PollCount":
+		pollCount, ok := ms.Buffer["PollCount"].([]int64)
+		if !ok {
+			return nil, ok
+		}
+		last := len(pollCount) - 1
+		if last < 0 {
+			return nil, false
+		}
+		return ms.Buffer["PollCount"].([]int64)[last], true
+	default:
+		val, ok := ms.Buffer[key]
+		if ok {
+			return val, ok
+		}
+	}
+	return nil, false
+}
+
+func (ms *MemStorage) GetAll() map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range ms.Buffer {
+		out[k] = v
+	}
+	return out
+}
+
+func (ms *MemStorage) Rewrite(key string, value gauge) {
+	ms.Buffer[key] = float64(value)
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		GaugeBuff:   make(map[string]gauge),
-		CounterBuff: make([]counter, 0),
+		Buffer: map[string]interface{}{
+			"PollCount": make([]int64, 0),
+		},
 	}
 }
 
