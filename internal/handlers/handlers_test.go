@@ -131,12 +131,12 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			statusCode:  http.StatusBadRequest,
 		},
 		{
-			name:        "Wrong metric",
-			path:        "/update/counter/Weather/a",
+			name:        "Wrong metric name",
+			path:        "/update/counter/Weather/2",
 			method:      http.MethodPost,
 			contentType: "text/plain",
 			want:        int64(1),
-			statusCode:  http.StatusNotFound,
+			statusCode:  http.StatusOK,
 		},
 	}
 
