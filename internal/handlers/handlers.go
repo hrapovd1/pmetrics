@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -18,6 +19,15 @@ type MetricStorage struct {
 	Storage storage.Repository
 }
 
+func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusNotImplemented)
+	_, err := rw.Write([]byte("It's not implemented yet."))
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
@@ -31,7 +41,8 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 
 	splitedPath := strings.Split(r.URL.Path, "/")
 	if len(splitedPath) < minPathLen {
-		http.Error(rw, err.Error(), http.StatusNotFound)
+		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
+		http.Error(rw, errMsg, http.StatusNotFound)
 		return
 	}
 
@@ -52,6 +63,7 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
+	var splitedPath []string
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -62,12 +74,19 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	splitedPath := strings.Split(r.URL.Path, "/")
+	splitedPath = strings.Split(r.URL.Path, "/")
 	if len(splitedPath) < minPathLen {
-		http.Error(rw, err.Error(), http.StatusNotFound)
+		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
+		http.Error(rw, errMsg, http.StatusNotFound)
 		return
 	}
 
+	metricKey := splitedPath[metricName]
+	if metricKey != "PollCount" {
+		errMsg := fmt.Sprint("Unexpected metric name: ", metricKey)
+		http.Error(rw, errMsg, http.StatusNotFound)
+		return
+	}
 	metricValue, err := storage.StrToCounter(splitedPath[metricVal])
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)

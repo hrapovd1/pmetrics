@@ -130,6 +130,14 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			want:        int64(1),
 			statusCode:  http.StatusBadRequest,
 		},
+		{
+			name:        "Wrong metric",
+			path:        "/update/counter/Weather/a",
+			method:      http.MethodPost,
+			contentType: "text/plain",
+			want:        int64(1),
+			statusCode:  http.StatusNotFound,
+		},
 	}
 
 	locStorage := storage.NewMemStorage()
@@ -161,5 +169,20 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 	}
 	t.Run("Check values count", func(t *testing.T) {
 		assert.Equal(t, 2, len(locStorage.CounterBuff))
+	})
+}
+
+func TestDefaultHandler(t *testing.T) {
+	reqst := httptest.NewRequest(http.MethodPost, "/update/any/", nil)
+	rec := httptest.NewRecorder()
+	hndl := http.HandlerFunc(NotImplementedHandler)
+	hndl.ServeHTTP(rec, reqst)
+
+	t.Run("Check not implemented", func(t *testing.T) {
+		result := rec.Result()
+		defer result.Body.Close()
+		_, err := io.ReadAll(result.Body)
+		assert.Nil(t, err)
+		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
 	})
 }
