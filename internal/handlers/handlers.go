@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -44,7 +43,6 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	log.Println("gauge splitedPath = ", splitedPath)
 	if len(splitedPath) < minPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
@@ -79,7 +77,6 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	log.Println("counter splitedPath = ", splitedPath)
 	if len(splitedPath) < minPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
@@ -93,9 +90,7 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if metricKey == "PollCount" {
-		ms.Storage.Append(metricValue)
-	}
+	ms.Storage.Append(metricKey, metricValue)
 
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write([]byte(""))
@@ -112,7 +107,6 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
-	log.Println("value splitedPath = ", splitedPath)
 	if len(splitedPath) < getPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
@@ -123,12 +117,6 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	metric := splitedPath[getMetricName]
 	var metricValue string
 
-	if (metricType == "gauge" && metric == "PollCount") ||
-		(metricType == "counter" && metric != "PollCount") {
-		errMsg := fmt.Sprint("Wrong type ", metricType, " for ", metric)
-		http.Error(rw, errMsg, http.StatusBadRequest)
-		return
-	}
 	if metricType == "gauge" || metricType == "counter" {
 		metricVal, ok := ms.Storage.Get(metric)
 		if !ok {
@@ -136,10 +124,11 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 			http.Error(rw, errMsg, http.StatusNotFound)
 			return
 		}
-		if metric == "PollCount" {
-			metricValue = fmt.Sprint(metricVal.(int64))
-		} else {
-			metricValue = fmt.Sprint(metricVal.(float64))
+		switch metricVal := metricVal.(type) {
+		case int64:
+			metricValue = fmt.Sprint(metricVal)
+		case float64:
+			metricValue = fmt.Sprint(metricVal)
 		}
 	} else {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)

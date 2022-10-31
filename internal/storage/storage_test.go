@@ -31,39 +31,51 @@ func TestMemStorage_Rewrite(t *testing.T) {
 		}
 	})
 	t.Run("Count values.", func(t *testing.T) {
-		assert.Equal(t, 2, len(ms.Buffer))
+		assert.Equal(t, 1, len(ms.Buffer))
 	})
 }
 
 func TestMemStorage_Append(t *testing.T) {
-	tests := []int64{1, 2, 3}
+	tests := []struct {
+		key   string
+		value int64
+	}{
+		{
+			key:   "Count1",
+			value: 23,
+		},
+		{
+			key:   "Count2",
+			value: -23,
+		},
+		{
+			key:   "Count3",
+			value: -0,
+		},
+	}
 	ms := NewMemStorage()
-	t.Run("Append values", func(t *testing.T) {
-		for _, val := range tests {
-			ms.Append(counter(val))
-			last := len(ms.Buffer["PollCount"].([]int64)) - 1
-			assert.Equal(t, val, ms.Buffer["PollCount"].([]int64)[last])
-		}
-	})
+	for _, test := range tests {
+		t.Run("Append values", func(t *testing.T) {
+			ms.Append(test.key, counter(test.value))
+			last := len(ms.Buffer[test.key].([]int64)) - 1
+			assert.Equal(t, test.value, ms.Buffer[test.key].([]int64)[last])
+		})
+	}
 	t.Run("Count values", func(t *testing.T) {
-		pollCount := ms.Buffer["PollCount"].([]int64)
-		assert.Equal(t, 3, len(pollCount))
+		assert.Equal(t, 3, len(ms.Buffer))
 	})
 }
 
 func TestNewMemStorage(t *testing.T) {
 	want := &MemStorage{
-		Buffer: map[string]interface{}{
-			"PollCount": make([]int64, 0),
-		},
+		Buffer: make(map[string]interface{}),
 	}
 	assert.True(t, cmp.Equal(NewMemStorage(), want))
 }
 
 func TestMemStorage_Get(t *testing.T) {
 	ms := NewMemStorage()
-	pollCount, _ := ms.Buffer["PollCount"].([]int64)
-	ms.Buffer["PollCount"] = append(pollCount, int64(1))
+	ms.Buffer["PollCount"] = []int64{1}
 	ms.Buffer["Alloc"] = float64(3.0)
 	ms.Buffer["TotalAlloc"] = float64(-3.0)
 

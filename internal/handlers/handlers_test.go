@@ -89,7 +89,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 		})
 	}
 	t.Run("Check values count", func(t *testing.T) {
-		assert.Equal(t, 2, len(locStorage.Buffer))
+		assert.Equal(t, 1, len(locStorage.Buffer))
 	})
 }
 
@@ -266,21 +266,9 @@ func TestMetricStorage_GetMetricHandler(t *testing.T) {
 			want:     "4",
 		},
 		{
-			name:     "PollCount1",
-			positive: false,
-			url:      "/value/gauge/PollCount",
-			want:     "4",
-		},
-		{
 			name:     "Sys",
 			positive: true,
 			url:      "/value/gauge/Sys",
-			want:     "0",
-		},
-		{
-			name:     "Sys1",
-			positive: false,
-			url:      "/value/counter/Sys",
 			want:     "0",
 		},
 		{
