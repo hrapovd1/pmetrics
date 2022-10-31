@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -43,6 +44,7 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
+	log.Println("gauge splitedPath = ", splitedPath)
 	if len(splitedPath) < minPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
@@ -77,6 +79,7 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
+	log.Println("counter splitedPath = ", splitedPath)
 	if len(splitedPath) < minPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
@@ -109,6 +112,7 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	}
 
 	splitedPath := strings.Split(r.URL.Path, "/")
+	log.Println("value splitedPath = ", splitedPath)
 	if len(splitedPath) < getPathLen {
 		errMsg := fmt.Sprint("URL - ", r.URL.Path, " - not found.")
 		http.Error(rw, errMsg, http.StatusNotFound)
