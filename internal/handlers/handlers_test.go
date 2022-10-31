@@ -208,10 +208,11 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 	result := rec.Result()
 	body, err := io.ReadAll(result.Body)
 	assert.Nil(t, err)
-	result.Body.Close()
+	defer result.Body.Close()
+	statusCode := result.StatusCode
 
 	t.Run("Status Code", func(t *testing.T) {
-		assert.Equal(t, result.StatusCode, http.StatusOK)
+		assert.Equal(t, statusCode, http.StatusOK)
 	})
 
 	val1 := strings.Split(string(body), "<tr><td>")
