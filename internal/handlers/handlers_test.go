@@ -207,13 +207,13 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 	hndl.ServeHTTP(rec, reqst)
 	result := rec.Result()
 	defer result.Body.Close()
+	body, err := io.ReadAll(result.Body)
+	assert.Nil(t, err)
 
 	t.Run("Status Code", func(t *testing.T) {
 		assert.Equal(t, result.StatusCode, http.StatusOK)
 	})
 
-	body, err := io.ReadAll(result.Body)
-	assert.Nil(t, err)
 	val1 := strings.Split(string(body), "<tr><td>")
 	val1 = val1[1:]
 	values := make([]string, 0)
