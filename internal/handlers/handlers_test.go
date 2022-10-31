@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -115,7 +116,7 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			path:        "/update/counter/PollCount/1",
 			method:      http.MethodPost,
 			contentType: "text/plain",
-			want:        int64(1),
+			want:        int64(35),
 			statusCode:  http.StatusOK,
 		},
 		{
@@ -134,14 +135,6 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 			want:        int64(1),
 			statusCode:  http.StatusBadRequest,
 		},
-		{
-			name:        "Wrong metric name",
-			path:        "/update/counter/Weather/2",
-			method:      http.MethodPost,
-			contentType: "text/plain",
-			want:        int64(1),
-			statusCode:  http.StatusOK,
-		},
 	}
 
 	locStorage := storage.NewMemStorage()
@@ -158,6 +151,7 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		hndl.ServeHTTP(rec, reqst)
 
 		t.Run(test.name, func(t *testing.T) {
+			log.Println(test.name, " ", test.path)
 			result := rec.Result()
 			defer result.Body.Close()
 			_, err := io.ReadAll(result.Body)
@@ -172,7 +166,7 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		})
 	}
 	t.Run("Check values count", func(t *testing.T) {
-		assert.Equal(t, 2, len(locStorage.Buffer["PollCount"].([]int64)))
+		assert.Equal(t, 1, len(locStorage.Buffer))
 	})
 }
 
@@ -245,7 +239,7 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 
 func TestMetricStorage_GetMetricHandler(t *testing.T) {
 	locStorage := storage.NewMemStorage()
-	locStorage.Buffer["PollCount"] = []int64{4}
+	locStorage.Buffer["PollCount"] = int64(4)
 	locStorage.Buffer["Sys"] = float64(0.0)
 	locStorage.Buffer["Alloc"] = float64(3.0)
 	locStorage.Buffer["TotalAlloc"] = float64(-3.1)

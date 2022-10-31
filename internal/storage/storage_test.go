@@ -57,8 +57,7 @@ func TestMemStorage_Append(t *testing.T) {
 	for _, test := range tests {
 		t.Run("Append values", func(t *testing.T) {
 			ms.Append(test.key, counter(test.value))
-			last := len(ms.Buffer[test.key].([]int64)) - 1
-			assert.Equal(t, test.value, ms.Buffer[test.key].([]int64)[last])
+			assert.Equal(t, test.value, ms.Buffer[test.key].(int64))
 		})
 	}
 	t.Run("Count values", func(t *testing.T) {
@@ -75,7 +74,7 @@ func TestNewMemStorage(t *testing.T) {
 
 func TestMemStorage_Get(t *testing.T) {
 	ms := NewMemStorage()
-	ms.Buffer["PollCount"] = []int64{1}
+	ms.Buffer["PollCount"] = int64(1)
 	ms.Buffer["Alloc"] = float64(3.0)
 	ms.Buffer["TotalAlloc"] = float64(-3.0)
 

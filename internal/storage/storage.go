@@ -21,12 +21,11 @@ type MemStorage struct {
 func (ms *MemStorage) Append(key string, value counter) {
 	_, ok := ms.Buffer[key]
 	if !ok {
-		ms.Buffer[key] = make([]int64, 0)
+		ms.Buffer[key] = int64(value)
+		return
 	}
-	ms.Buffer[key] = append(
-		ms.Buffer[key].([]int64),
-		int64(value),
-	)
+	val := ms.Buffer[key].(int64) + int64(value)
+	ms.Buffer[key] = int64(val)
 }
 
 func (ms *MemStorage) Get(key string) (interface{}, bool) {
@@ -35,12 +34,8 @@ func (ms *MemStorage) Get(key string) (interface{}, bool) {
 		switch val := val.(type) {
 		case float64:
 			return val, ok
-		case []int64:
-			last := len(val) - 1
-			if last > -1 {
-				return val[last], ok
-			}
-			return nil, false
+		case int64:
+			return val, ok
 		}
 	}
 	return nil, false
