@@ -133,7 +133,7 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 		metricVal, ok := ms.Storage.Get(metric)
 		if !ok {
 			errMsg := fmt.Sprint("Error when get ", metric)
-			http.Error(rw, errMsg, http.StatusInternalServerError)
+			http.Error(rw, errMsg, http.StatusNotFound)
 			return
 		}
 		if metric == "PollCount" {
