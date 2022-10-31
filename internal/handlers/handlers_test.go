@@ -243,5 +243,83 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 }
 
 func TestMetricStorage_GetMetricHandler(t *testing.T) {
-	assert.True(t, false)
+	locStorage := storage.NewMemStorage()
+	locStorage.Buffer["PollCount"] = []int64{4}
+	locStorage.Buffer["Sys"] = float64(0.0)
+	locStorage.Buffer["Alloc"] = float64(3.0)
+	locStorage.Buffer["TotalAlloc"] = float64(-3.1)
+	ms := MetricStorage{
+		Storage: locStorage,
+	}
+
+	tests := []struct {
+		name     string
+		positive bool
+		url      string
+		want     string
+	}{
+		{
+			name:     "PollCount",
+			positive: true,
+			url:      "/value/counter/PollCount",
+			want:     "4",
+		},
+		{
+			name:     "PollCount1",
+			positive: false,
+			url:      "/value/gauge/PollCount",
+			want:     "4",
+		},
+		{
+			name:     "Sys",
+			positive: true,
+			url:      "/value/gauge/Sys",
+			want:     "0",
+		},
+		{
+			name:     "Sys1",
+			positive: false,
+			url:      "/value/counter/Sys",
+			want:     "0",
+		},
+		{
+			name:     "Alloc",
+			positive: true,
+			url:      "/value/gauge/Alloc",
+			want:     "3",
+		},
+		{
+			name:     "TotalAlloc",
+			positive: true,
+			url:      "/value/gauge/TotalAlloc",
+			want:     "-3.1",
+		},
+		{
+			name:     "Wrong url",
+			positive: false,
+			url:      "/value/gauge/",
+			want:     "-3.1",
+		},
+	}
+	hndl := http.HandlerFunc(ms.GetMetricHandler)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			reqst := httptest.NewRequest(http.MethodGet, test.url, nil)
+			// qeury server
+			hndl.ServeHTTP(rec, reqst)
+			result := rec.Result()
+			defer result.Body.Close()
+			body, err := io.ReadAll(result.Body)
+			require.NoError(t, err)
+
+			if test.positive {
+				assert.Equal(t, http.StatusOK, result.StatusCode)
+				assert.Equal(t, test.want, string(body))
+			} else {
+				assert.NotEqual(t, http.StatusOK, result.StatusCode)
+			}
+		})
+	}
 }

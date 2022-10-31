@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/hrapovd1/pmetrics/internal/handlers"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
@@ -21,11 +23,17 @@ var handlersStorage = handlers.MetricStorage{
 func main() {
 	serverAddr := fmt.Sprint(serverHost, ":", serverPort)
 
-	http.HandleFunc("/update/gauge/", handlersStorage.GaugeHandler)
-	http.HandleFunc("/update/counter/", handlersStorage.CounterHandler)
-	http.HandleFunc("/update/", handlers.NotImplementedHandler)
-	http.HandleFunc("/value/", handlersStorage.GetMetricHandler)
-	http.HandleFunc("/", handlersStorage.GetAllHandler)
+	router := chi.NewRouter()
+	router.Get("/", handlersStorage.GetAllHandler)
+	router.Get("/value/*", handlersStorage.GetMetricHandler)
+
+	update := chi.NewRouter()
+	update.Post("/gauge/*", handlersStorage.GaugeHandler)
+	update.Post("/counter/*", handlersStorage.CounterHandler)
+	update.Post("/*", handlers.NotImplementedHandler)
+
+	router.Mount("/update", update)
+
 	log.Println("Server start on ", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, nil))
+	log.Fatal(http.ListenAndServe(serverAddr, router))
 }
