@@ -23,15 +23,17 @@ func TestMemStorage_Rewrite(t *testing.T) {
 			value: 1,
 		},
 	}
-	ms := NewMemStorage()
+
+	stor := make(map[string]interface{})
+	ms := NewMemStorage(WithBuffer(stor))
 	t.Run("Rewrite values.", func(t *testing.T) {
 		for _, tt := range tests {
 			ms.Rewrite(tt.key, gauge(tt.value))
-			assert.Equal(t, tt.value, ms.Buffer[tt.key])
+			assert.Equal(t, tt.value, stor[tt.key])
 		}
 	})
 	t.Run("Count values.", func(t *testing.T) {
-		assert.Equal(t, 1, len(ms.Buffer))
+		assert.Equal(t, 1, len(stor))
 	})
 }
 
@@ -53,30 +55,25 @@ func TestMemStorage_Append(t *testing.T) {
 			value: -0,
 		},
 	}
-	ms := NewMemStorage()
+	stor := make(map[string]interface{})
+	ms := NewMemStorage(WithBuffer(stor))
 	for _, test := range tests {
 		t.Run("Append values", func(t *testing.T) {
 			ms.Append(test.key, counter(test.value))
-			assert.Equal(t, test.value, ms.Buffer[test.key].(int64))
+			assert.Equal(t, test.value, stor[test.key].(int64))
 		})
 	}
 	t.Run("Count values", func(t *testing.T) {
-		assert.Equal(t, 3, len(ms.Buffer))
+		assert.Equal(t, 3, len(stor))
 	})
 }
 
-func TestNewMemStorage(t *testing.T) {
-	want := &MemStorage{
-		Buffer: make(map[string]interface{}),
-	}
-	assert.True(t, cmp.Equal(NewMemStorage(), want))
-}
-
 func TestMemStorage_Get(t *testing.T) {
-	ms := NewMemStorage()
-	ms.Buffer["PollCount"] = int64(1)
-	ms.Buffer["Alloc"] = float64(3.0)
-	ms.Buffer["TotalAlloc"] = float64(-3.0)
+	stor := make(map[string]interface{})
+	ms := NewMemStorage(WithBuffer(stor))
+	stor["PollCount"] = int64(1)
+	stor["Alloc"] = float64(3.0)
+	stor["TotalAlloc"] = float64(-3.0)
 
 	tests := []struct {
 		name     string
@@ -117,29 +114,30 @@ func TestMemStorage_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.positive {
-				metric, ok := ms.Get(tt.name)
-				require.True(t, ok)
+				metric := ms.Get(tt.name)
+				require.NotNil(t, metric)
 				if tt.pcount {
 					assert.Equal(t, tt.want2, metric.(int64))
 				} else {
 					assert.Equal(t, tt.want1, metric.(float64))
 				}
 			} else {
-				_, ok := ms.Get(tt.name)
-				require.False(t, ok)
+				metric := ms.Get(tt.name)
+				require.Nil(t, metric)
 			}
 		})
 	}
 }
 
 func TestMemStorage_GetAll(t *testing.T) {
-	ms := NewMemStorage()
-	ms.Buffer["PollCount"] = []int64{4}
-	ms.Buffer["Alloc"] = float64(3.0)
-	ms.Buffer["TotalAlloc"] = float64(-3.0)
+	stor := make(map[string]interface{})
+	ms := NewMemStorage(WithBuffer(stor))
+	stor["PollCount"] = []int64{4}
+	stor["Alloc"] = float64(3.0)
+	stor["TotalAlloc"] = float64(-3.0)
 	t.Run("Check GetAll", func(t *testing.T) {
 		out := ms.GetAll()
-		assert.True(t, cmp.Equal(ms.Buffer, out))
+		assert.True(t, cmp.Equal(stor, out))
 	})
 }
 

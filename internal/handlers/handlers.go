@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"embed"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
+
+//go:embed templates/index.html
+var index embed.FS
 
 const (
 	metricName    = 3
@@ -118,8 +123,8 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	var metricValue string
 
 	if metricType == "gauge" || metricType == "counter" {
-		metricVal, ok := ms.Storage.Get(metric)
-		if !ok {
+		metricVal := ms.Storage.Get(metric)
+		if metricVal == nil {
 			errMsg := fmt.Sprint("Error when get ", metric)
 			http.Error(rw, errMsg, http.StatusNotFound)
 			return
@@ -150,45 +155,29 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	outPage := []string{
-		"<html>",
-		"<head><title> All metrics </title></head>",
-		"<body>",
-		"<table><thead><tr>",
-		"<th>Metric name</th><th>Metric value</th>",
-		"</tr></thead><tbody>",
+	type table struct {
+		Key string
+		Val string
 	}
+	outTable := make([]table, 0)
 
 	for k, v := range ms.Storage.GetAll() {
-		var outString string
-		if k == "PollCount" {
-			pollCount, ok := v.([]int64)
-			if !ok {
-				http.Error(rw, "", http.StatusInternalServerError)
-				return
-			}
-			if len(pollCount) > 0 {
-				last := len(pollCount) - 1
-				outString = fmt.Sprint("<tr><td>", k, "</td><td>", pollCount[last], "</td></tr>")
-			}
-		} else {
-			val := v.(float64)
-			outString = fmt.Sprint("<tr><td>", k, "</td><td>", val, "</td></tr>")
+		switch value := v.(type) {
+		case int64:
+			outTable = append(outTable, table{Key: k, Val: fmt.Sprint(value)})
+		case float64:
+			outTable = append(outTable, table{Key: k, Val: fmt.Sprint(value)})
 		}
-		outPage = append(
-			outPage,
-			outString,
-		)
 	}
 
-	outPage = append(
-		outPage,
-		"</tbody></table></body></html>",
-	)
+	indexTmplt, err := template.ParseFS(index, "templates/index.html")
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	rw.Header().Set("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusOK)
-	_, err := rw.Write([]byte(strings.Join(outPage, "")))
+	err = indexTmplt.Execute(rw, outTable)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return

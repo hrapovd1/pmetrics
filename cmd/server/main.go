@@ -7,13 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/handlers"
 	"github.com/hrapovd1/pmetrics/internal/storage"
-)
-
-const (
-	serverHost = "127.0.0.1"
-	serverPort = "8080"
 )
 
 var handlersStorage = handlers.MetricStorage{
@@ -21,7 +17,7 @@ var handlersStorage = handlers.MetricStorage{
 }
 
 func main() {
-	serverAddr := fmt.Sprint(serverHost, ":", serverPort)
+	serverAddr := fmt.Sprint(config.ServerConfig.ServerAddress, ":", config.ServerConfig.ServerPort)
 
 	router := chi.NewRouter()
 	router.Get("/", handlersStorage.GetAllHandler)
