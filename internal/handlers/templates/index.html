@@ -11,8 +11,8 @@
             </tr>
         </thead>
         <tbody>
-		{{- range . -}}
-        	<tr><td>{{- .Key -}}</td><td>{{- .Val -}}</td></tr>
+		{{- range $key, $value := . -}}
+        	<tr><td>{{- $key -}}</td><td>{{- $value -}}</td></tr>
 		{{end}}
 		</tbody>
     </table>

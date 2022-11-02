@@ -9,18 +9,15 @@ import (
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/usecase"
 )
 
 //go:embed templates/index.html
 var index embed.FS
 
 const (
-	metricName    = 3
-	metricVal     = 4
-	minPathLen    = 5
-	getMetricType = 2
-	getMetricName = 3
-	getPathLen    = 4
+	minPathLen = 5
+	getPathLen = 4
 )
 
 type MetricStorage struct {
@@ -54,13 +51,11 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricKey := splitedPath[metricName]
-	metricValue, err := storage.StrToGauge(splitedPath[metricVal])
+	err = usecase.WriteMetric(ms.Storage.(*storage.MemStorage), splitedPath)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	ms.Storage.Rewrite(metricKey, metricValue)
 
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write([]byte(""))
@@ -88,14 +83,11 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	metricKey := splitedPath[metricName]
-	metricValue, err := storage.StrToCounter(splitedPath[metricVal])
+	err = usecase.WriteMetric(ms.Storage.(*storage.MemStorage), splitedPath)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	ms.Storage.Append(metricKey, metricValue)
 
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write([]byte(""))
@@ -118,31 +110,19 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	metricType := splitedPath[getMetricType]
-	metric := splitedPath[getMetricName]
-	var metricValue string
-
-	if metricType == "gauge" || metricType == "counter" {
-		metricVal := ms.Storage.Get(metric)
-		if metricVal == nil {
-			errMsg := fmt.Sprint("Error when get ", metric)
-			http.Error(rw, errMsg, http.StatusNotFound)
-			return
-		}
-		switch metricVal := metricVal.(type) {
-		case int64:
-			metricValue = fmt.Sprint(metricVal)
-		case float64:
-			metricValue = fmt.Sprint(metricVal)
-		}
-	} else {
+	metricVal, err := usecase.GetMetric(ms.Storage.(*storage.MemStorage), splitedPath)
+	if metricVal == "" {
+		http.Error(rw, "Error when get metric", http.StatusNotFound)
+		return
+	}
+	if err != nil {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)
 		return
 	}
 
 	rw.Header().Set("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusOK)
-	_, err := rw.Write([]byte(metricValue))
+	_, err = rw.Write([]byte(metricVal))
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
@@ -155,20 +135,7 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	type table struct {
-		Key string
-		Val string
-	}
-	outTable := make([]table, 0)
-
-	for k, v := range ms.Storage.GetAll() {
-		switch value := v.(type) {
-		case int64:
-			outTable = append(outTable, table{Key: k, Val: fmt.Sprint(value)})
-		case float64:
-			outTable = append(outTable, table{Key: k, Val: fmt.Sprint(value)})
-		}
-	}
+	outTable := usecase.GetTableMetrics(ms.Storage.(*storage.MemStorage))
 
 	indexTmplt, err := template.ParseFS(index, "templates/index.html")
 	if err != nil {
