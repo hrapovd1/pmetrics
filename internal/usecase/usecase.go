@@ -31,7 +31,7 @@ func WriteMetric(ms *storage.MemStorage, path []string) error {
 		}
 		return err
 	default:
-		return errors.New("Undefined metric type.")
+		return errors.New("undefined metric type")
 	}
 }
 
@@ -52,7 +52,7 @@ func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
 			metricValue = ""
 		}
 	} else {
-		err = errors.New("Undefined metric type.")
+		err = errors.New("undefined metric type")
 	}
 	return metricValue, err
 }
