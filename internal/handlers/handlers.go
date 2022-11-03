@@ -108,12 +108,12 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	}
 
 	metricVal, err := usecase.GetMetric(ms.Storage.(*storage.MemStorage), splitedPath)
-	if metricVal == "" {
-		http.Error(rw, "Error when get metric", http.StatusNotFound)
-		return
-	}
 	if err != nil {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)
+		return
+	}
+	if metricVal == "" {
+		http.Error(rw, "Error when get metric", http.StatusNotFound)
 		return
 	}
 
