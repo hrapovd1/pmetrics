@@ -1,16 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"runtime"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hrapovd1/pmetrics/internal/config"
 )
 
@@ -21,7 +19,7 @@ func main() {
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
 	pollTick := time.NewTicker(config.AgentConfig.PollInterval)
 	reportTick := time.NewTicker(config.AgentConfig.ReportInterval)
-	httpClient := &http.Client{}
+	httpClient := resty.New()
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 28)
 
@@ -35,32 +33,19 @@ func main() {
 		case <-reportTick.C:
 			for k, v := range metrics {
 				metricURL := fmt.Sprint("http://", config.AgentConfig.ServerAddress, ":", config.AgentConfig.ServerPort, "/update/gauge/", k, "/", v)
-				reportClient(httpClient, metricURL, logger)
+				_, err := httpClient.R().SetHeader("Content-Type", "text/plain").Post(metricURL)
+				if err != nil {
+					logger.Print("Error when sent metric. ", err)
+					return
+				}
 			}
 			metricURL := fmt.Sprint("http://", config.AgentConfig.ServerAddress, ":", config.AgentConfig.ServerPort, "/update/counter/PollCount/", PollCount)
-			reportClient(httpClient, metricURL, logger)
+			_, err := httpClient.R().SetHeader("Content-Type", "text/plain").Post(metricURL)
+			if err != nil {
+				logger.Print("Error when sent metric. ", err)
+				return
+			}
 		}
-	}
-}
-
-func reportClient(client *http.Client, url string, logger *log.Logger) {
-	data := []byte("")
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
-	if err != nil {
-		logger.Print("Error reading request. ", err)
-		return
-	}
-	req.Header.Set("Content-Type", "text/plain")
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Print("Error reading response. ", err)
-		return
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		logger.Print("Error reading body. ", err)
-		return
 	}
 }
 

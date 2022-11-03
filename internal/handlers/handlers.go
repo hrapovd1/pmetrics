@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -10,10 +9,8 @@ import (
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
+	"github.com/hrapovd1/pmetrics/templates/core"
 )
-
-//go:embed templates/index.html
-var index embed.FS
 
 const (
 	minPathLen = 5
@@ -137,7 +134,7 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 
 	outTable := usecase.GetTableMetrics(ms.Storage.(*storage.MemStorage))
 
-	indexTmplt, err := template.ParseFS(index, "templates/index.html")
+	indexTmplt, err := template.ParseFS(core.Index, "index.html")
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
