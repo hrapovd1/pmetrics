@@ -46,10 +46,6 @@ func (ms *MemStorage) Get(key string) interface{} {
 }
 
 func (ms *MemStorage) GetAll() map[string]interface{} {
-	out := make(map[string]interface{})
-	for k, v := range ms.buffer {
-		out[k] = v
-	}
 	return maps.Clone(ms.buffer)
 }
 
