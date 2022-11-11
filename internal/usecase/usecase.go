@@ -79,18 +79,20 @@ func GetJSONMetric(ms *storage.MemStorage, data *types.Metrics) error {
 	switch data.MType {
 	case "gauge":
 		val := ms.Get(data.ID)
-		if val != nil {
-			value := val.(float64)
-			data.Value = &value
-			err = nil
+		if val == nil {
+			return errors.New("not found")
 		}
+		value := val.(float64)
+		data.Value = &value
+		err = nil
 	case "counter":
 		val := ms.Get(data.ID)
-		if val != nil {
-			value := val.(int64)
-			data.Delta = &value
-			err = nil
+		if val == nil {
+			return errors.New("not found")
 		}
+		value := val.(int64)
+		data.Delta = &value
+		err = nil
 	default:
 		err = errors.New("undefined metric type")
 	}

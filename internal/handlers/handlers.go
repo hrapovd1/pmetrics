@@ -80,9 +80,8 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 	}
 
 	// Get metric value for response
-	err = usecase.GetJSONMetric(ms.Storage.(*storage.MemStorage), &data)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+	if err = usecase.GetJSONMetric(ms.Storage.(*storage.MemStorage), &data); err != nil {
+		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
 

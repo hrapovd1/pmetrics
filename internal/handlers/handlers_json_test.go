@@ -96,7 +96,7 @@ func TestMetricStorage_GetMetricJSONHandler(t *testing.T) {
 			name:        "Wrong data",
 			data:        `{}`,
 			contentType: "application/json",
-			statusCode:  http.StatusBadRequest,
+			statusCode:  http.StatusNotFound,
 		},
 	}
 	hndl := http.HandlerFunc(ms.GetMetricJSONHandler)
