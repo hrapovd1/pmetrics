@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"errors"
 	"log"
 	"math/rand"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hrapovd1/pmetrics/internal/config"
+	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
 type gauge float64
@@ -22,6 +24,7 @@ func main() {
 	httpClient := resty.New()
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 28)
+	metricURL := "http://" + config.AgentConfig.ServerAddress + ":" + config.AgentConfig.ServerPort + "/update/"
 
 	logger.Println("started")
 	defer logger.Println("stopped")
@@ -32,15 +35,27 @@ func main() {
 			pollMetrics(metrics)
 		case <-reportTick.C:
 			for k, v := range metrics {
-				metricURL := fmt.Sprint("http://", config.AgentConfig.ServerAddress, ":", config.AgentConfig.ServerPort, "/update/gauge/", k, "/", v)
-				_, err := httpClient.R().SetHeader("Content-Type", "text/plain").Post(metricURL)
+				data, err := metricToJSON(k, v)
+				if err != nil {
+					logger.Fatalln(err)
+				}
+				_, err = httpClient.R().
+					SetHeader("Content-Type", "application/json").
+					SetBody(data).
+					Post(metricURL)
 				if err != nil {
 					logger.Print("Error when sent metric. ", err)
 					return
 				}
 			}
-			metricURL := fmt.Sprint("http://", config.AgentConfig.ServerAddress, ":", config.AgentConfig.ServerPort, "/update/counter/PollCount/", PollCount)
-			_, err := httpClient.R().SetHeader("Content-Type", "text/plain").Post(metricURL)
+			data, err := metricToJSON("PollCount", PollCount)
+			if err != nil {
+				logger.Fatalln(err)
+			}
+			_, err = httpClient.R().
+				SetHeader("Content-Type", "application/json").
+				SetBody(data).
+				Post(metricURL)
 			if err != nil {
 				logger.Print("Error when sent metric. ", err)
 				return
@@ -80,4 +95,30 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["NumForcedGC"] = gauge(rtm.NumForcedGC)
 	metrics["GCCPUFraction"] = gauge(rtm.GCCPUFraction)
 	metrics["RandomValue"] = gauge(rand.Float64())
+}
+
+func metricToJSON(name string, val interface{}) ([]byte, error) {
+	var value float64
+	var delta int64
+	switch val := val.(type) {
+	case gauge:
+		value = float64(val)
+		return json.Marshal(
+			types.Metrics{
+				ID:    name,
+				MType: "gauge",
+				Value: &value,
+			},
+		)
+	case counter:
+		delta = int64(val)
+		return json.Marshal(
+			types.Metrics{
+				ID:    name,
+				MType: "counter",
+				Delta: &delta,
+			},
+		)
+	}
+	return nil, errors.New("got undefined metric type")
 }

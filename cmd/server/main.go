@@ -21,14 +21,8 @@ func main() {
 
 	router := chi.NewRouter()
 	router.Get("/", handlersStorage.GetAllHandler)
-	router.Get("/value/*", handlersStorage.GetMetricHandler)
-
-	update := chi.NewRouter()
-	update.Post("/gauge/*", handlersStorage.GaugeHandler)
-	update.Post("/counter/*", handlersStorage.CounterHandler)
-	update.Post("/*", handlers.NotImplementedHandler)
-
-	router.Mount("/update", update)
+	router.Post("/value/", handlersStorage.GetMetricHandler)
+	router.Post("/update/", handlersStorage.UpdateHandler)
 
 	log.Println("Server start on ", serverAddr)
 	log.Fatal(http.ListenAndServe(serverAddr, router))

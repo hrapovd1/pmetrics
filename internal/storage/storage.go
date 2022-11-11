@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"strconv"
-
 	"golang.org/x/exp/maps"
 )
 
@@ -72,12 +70,10 @@ func WithBuffer(buffer map[string]interface{}) Option {
 	}
 }
 
-func StrToGauge(input string) (gauge, error) {
-	out, err := strconv.ParseFloat(input, 64)
-	return gauge(out), err
+func ToGauge(input float64) gauge {
+	return gauge(input)
 }
 
-func StrToCounter(input string) (counter, error) {
-	out, err := strconv.ParseInt(input, 10, 64)
-	return counter(out), err
+func ToCounter(input int64) counter {
+	return counter(input)
 }
