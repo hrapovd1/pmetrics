@@ -21,7 +21,7 @@ func main() {
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
 	pollTick := time.NewTicker(config.AgentConfig.PollInterval)
 	reportTick := time.NewTicker(config.AgentConfig.ReportInterval)
-	httpClient := resty.New()
+	httpClient := resty.New().SetRetryCount(config.AgentConfig.RetryCount)
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 28)
 	metricURL := "http://" + config.AgentConfig.ServerAddress + ":" + config.AgentConfig.ServerPort + "/update/"
