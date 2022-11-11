@@ -218,3 +218,12 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 }
+
+func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusNotImplemented)
+	_, err := rw.Write([]byte("It's not implemented yet."))
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusNotImplemented)
+		return
+	}
+}

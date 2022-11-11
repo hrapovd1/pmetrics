@@ -28,6 +28,7 @@ func main() {
 	update.Post("/gauge/*", handlersStorage.GaugeHandler)
 	update.Post("/counter/*", handlersStorage.CounterHandler)
 	update.Post("/", handlersStorage.UpdateHandler)
+	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)
 
