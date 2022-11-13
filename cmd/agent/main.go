@@ -18,13 +18,17 @@ type gauge float64
 type counter int64
 
 func main() {
+	var agentConf config.Config
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
-	pollTick := time.NewTicker(config.AgentConfig.PollInterval)
-	reportTick := time.NewTicker(config.AgentConfig.ReportInterval)
-	httpClient := resty.New().SetRetryCount(config.AgentConfig.RetryCount)
+	if err := agentConf.NewAgent(); err != nil {
+		logger.Fatalln(err)
+	}
+	pollTick := time.NewTicker(agentConf.PollInterval)
+	reportTick := time.NewTicker(agentConf.ReportInterval)
+	httpClient := resty.New().SetRetryCount(agentConf.RetryCount)
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 28)
-	metricURL := "http://" + config.AgentConfig.ServerAddress + ":" + config.AgentConfig.ServerPort + "/update/"
+	metricURL := "http://" + agentConf.ServerAddress + "/update/"
 
 	logger.Println("started")
 	defer logger.Println("stopped")

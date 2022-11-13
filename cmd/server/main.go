@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -17,7 +17,11 @@ var handlersStorage = handlers.MetricStorage{
 }
 
 func main() {
-	serverAddr := fmt.Sprint(config.ServerConfig.ServerAddress, ":", config.ServerConfig.ServerPort)
+	var serverConf config.Config
+	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
+	if err := serverConf.NewServer(); err != nil {
+		logger.Fatalln(err)
+	}
 
 	router := chi.NewRouter()
 	router.Get("/", handlersStorage.GetAllHandler)
@@ -32,6 +36,6 @@ func main() {
 
 	router.Mount("/update", update)
 
-	log.Println("Server start on ", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, router))
+	log.Println("Server start on ", serverConf.ServerAddress)
+	log.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
 }
