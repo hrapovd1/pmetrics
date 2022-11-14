@@ -16,22 +16,22 @@ func TestWriteJSONMetric(t *testing.T) {
 	M2 := float64(-4.65)
 	tests := []struct {
 		name string
-		data types.Metrics
+		data types.Metric
 		want string
 	}{
 		{
 			name: "M1",
-			data: types.Metrics{ID: "M1", MType: "counter", Delta: &M1},
+			data: types.Metric{ID: "M1", MType: "counter", Delta: &M1},
 			want: "5",
 		},
 		{
 			name: "M2",
-			data: types.Metrics{ID: "M2", MType: "gauge", Value: &M2},
+			data: types.Metric{ID: "M2", MType: "gauge", Value: &M2},
 			want: "-4.65",
 		},
 	}
 	stor := make(map[string]interface{})
-	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(, storage.WithBuffer(stor))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := WriteJSONMetric(locStorage, tt.data)
@@ -49,25 +49,25 @@ func TestWriteJSONMetric(t *testing.T) {
 func TestGetJSONMetric(t *testing.T) {
 	tests := []struct {
 		name    string
-		data    types.Metrics
+		data    types.Metric
 		withErr bool
 		want    string
 	}{
 		{
 			name:    "M1",
-			data:    types.Metrics{ID: "M1", MType: "counter"},
+			data:    types.Metric{ID: "M1", MType: "counter"},
 			withErr: false,
 			want:    "5",
 		},
 		{
 			name:    "M2",
-			data:    types.Metrics{ID: "M2", MType: "gauge"},
+			data:    types.Metric{ID: "M2", MType: "gauge"},
 			withErr: false,
 			want:    "-4.65",
 		},
 		{
 			name:    "M3",
-			data:    types.Metrics{ID: "M3", MType: "type"},
+			data:    types.Metric{ID: "M3", MType: "type"},
 			withErr: true,
 			want:    "<nil>",
 		},

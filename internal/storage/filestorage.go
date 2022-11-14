@@ -4,18 +4,18 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/types"
-	"github.com/hrapovd1/pmetrics/internal/usecase"
 )
 
-func newBackend(backConf config.Config, buff *map[string]interface{}) fileStorage {
+func newBackend(backConf config.Config, buff map[string]interface{}) fileStorage {
+	fs := fileStorage{}
 	if backConf.StoreFile == "" {
-		return fileStorage{}
+		return fs
 	}
 	var err error
-	fs := fileStorage{}
 	fs.config = backConf
 	fs.buff = buff
 	fs.file, err = os.OpenFile(backConf.StoreFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
@@ -31,26 +31,30 @@ func (fs *fileStorage) Close() error {
 }
 
 func (fs *fileStorage) Restore() error {
-	ms := NewMemStorage(fs.config, WithBuffer(*fs.buff))
 	var err error
 	scan := bufio.NewScanner(fs.file)
 	var data []byte
 	for scan.Scan() {
 		data = scan.Bytes()
 	}
-	metrics := make([]types.Metrics, 0)
+	metrics := make([]types.Metric, 0)
 	err = json.Unmarshal(data, &metrics)
 	for _, metric := range metrics {
-		err = usecase.WriteJSONMetric(&ms, metric)
+		switch metric.MType {
+		case "gauge":
+			fs.buff[metric.ID] = metric.Value
+		case "counter":
+			fs.buff[metric.ID] = metric.Delta
+		}
 	}
 
 	return err
 }
 
 func (fs *fileStorage) Store() error {
-	metrics := make([]types.Metrics, 0)
-	for k, v := range *fs.buff {
-		metric := types.Metrics{ID: k}
+	metrics := make([]types.Metric, 0)
+	for k, v := range fs.buff {
+		metric := types.Metric{ID: k}
 		switch val := v.(type) {
 		case int64:
 			metric.MType = "counter"
@@ -72,4 +76,15 @@ func (fs *fileStorage) Store() error {
 		return err
 	}
 	return fs.writer.Flush()
+}
+
+func (fs *fileStorage) Storing(donech chan struct{}) {
+	defer fs.Close()
+	storeTick := time.NewTicker(fs.config.StoreInterval)
+	select {
+	case <-donech:
+		return
+	case <-storeTick.C:
+		fs.Store()
+	}
 }

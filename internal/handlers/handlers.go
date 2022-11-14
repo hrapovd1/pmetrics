@@ -31,7 +31,7 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var data types.Metrics
+	var data types.Metric
 	if err := json.Unmarshal(body, &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
@@ -73,7 +73,7 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var data types.Metrics
+	var data types.Metric
 	if err := json.Unmarshal(body, &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return

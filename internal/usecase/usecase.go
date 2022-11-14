@@ -58,7 +58,7 @@ func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
 	return metricValue, err
 }
 
-func WriteJSONMetric(ms *storage.MemStorage, data types.Metrics) error {
+func WriteJSONMetric(ms *storage.MemStorage, data types.Metric) error {
 	switch data.MType {
 	case "gauge":
 		metricValue := storage.ToGauge(*data.Value)
@@ -73,7 +73,7 @@ func WriteJSONMetric(ms *storage.MemStorage, data types.Metrics) error {
 	}
 }
 
-func GetJSONMetric(ms *storage.MemStorage, data *types.Metrics) error {
+func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
 	var err error
 
 	switch data.MType {

@@ -108,7 +108,7 @@ func metricToJSON(name string, val interface{}) ([]byte, error) {
 	case gauge:
 		value = float64(val)
 		return json.Marshal(
-			types.Metrics{
+			types.Metric{
 				ID:    name,
 				MType: "gauge",
 				Value: &value,
@@ -117,7 +117,7 @@ func metricToJSON(name string, val interface{}) ([]byte, error) {
 	case counter:
 		delta = int64(val)
 		return json.Marshal(
-			types.Metrics{
+			types.Metric{
 				ID:    name,
 				MType: "counter",
 				Delta: &delta,

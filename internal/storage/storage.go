@@ -23,7 +23,7 @@ type fileStorage struct {
 	file   *os.File
 	writer *bufio.Writer
 	config config.Config
-	buff   *map[string]interface{}
+	buff   map[string]interface{}
 }
 
 type MemStorage struct {
@@ -68,7 +68,7 @@ func NewMemStorage(storConfig config.Config, opts ...Option) *MemStorage {
 	buffer := make(map[string]interface{})
 	ms := &MemStorage{
 		buffer:  buffer,
-		backend: newBackend(storConfig, &buffer),
+		backend: newBackend(storConfig, buffer),
 	}
 
 	for _, opt := range opts {
