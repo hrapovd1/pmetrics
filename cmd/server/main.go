@@ -12,15 +12,14 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
 
-var handlersStorage = handlers.MetricStorage{
-	Storage: storage.NewMemStorage(),
-}
-
 func main() {
 	var serverConf config.Config
 	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
 	if err := serverConf.NewServer(); err != nil {
 		logger.Fatalln(err)
+	}
+	handlersStorage := handlers.MetricStorage{
+		Storage: storage.NewMemStorage(serverConf),
 	}
 
 	router := chi.NewRouter()

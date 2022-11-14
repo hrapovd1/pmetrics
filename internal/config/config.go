@@ -12,7 +12,10 @@ import (
 type environ struct {
 	PollInterval   string `env:"POLL_INTERVAL" envDefault:"2s"`
 	ReportInterval string `env:"REPORT_INTERVAL" envDefault:"10s"`
+	StoreInterval  string `env:"STORE_INTERVAL" envDefault:"300s"`
 	Address        string `env:"ADDRESS" envDefault:"localhost:8080"`
+	StoreFile      string `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
+	IsRestore      bool   `env:"RESTORE" envDefault:"true"`
 }
 
 type Config struct {
@@ -20,6 +23,9 @@ type Config struct {
 	ReportInterval time.Duration
 	RetryCount     int
 	ServerAddress  string
+	StoreInterval  time.Duration
+	StoreFile      string
+	IsRestore      bool
 }
 
 func (cfg *Config) NewAgent() error {
@@ -40,9 +46,18 @@ func (cfg *Config) NewAgent() error {
 }
 
 func (cfg *Config) NewServer() error {
+	var err error
 	var envs environ
-	err := env.Parse(&envs)
+	if err = env.Parse(&envs); err != nil {
+		return err
+	}
 	cfg.ServerAddress = envs.Address
+	if cfg.StoreInterval, err = parseInterval(envs.StoreInterval); err != nil {
+		return err
+	}
+	cfg.StoreFile = envs.StoreFile
+	cfg.IsRestore = envs.IsRestore
+
 	return err
 }
 

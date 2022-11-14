@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"bufio"
+	"os"
 	"strconv"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"golang.org/x/exp/maps"
 )
 
@@ -16,8 +19,16 @@ type Repository interface {
 	Rewrite(key string, value gauge)
 }
 
+type fileStorage struct {
+	file   *os.File
+	writer *bufio.Writer
+	config config.Config
+	buff   *map[string]interface{}
+}
+
 type MemStorage struct {
-	buffer map[string]interface{}
+	buffer  map[string]interface{}
+	backend fileStorage
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -53,9 +64,11 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
 }
 
-func NewMemStorage(opts ...Option) *MemStorage {
+func NewMemStorage(storConfig config.Config, opts ...Option) *MemStorage {
+	buffer := make(map[string]interface{})
 	ms := &MemStorage{
-		buffer: make(map[string]interface{}),
+		buffer:  buffer,
+		backend: newBackend(storConfig, &buffer),
 	}
 
 	for _, opt := range opts {
