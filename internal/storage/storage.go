@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"bufio"
-	"os"
 	"strconv"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
@@ -19,16 +17,8 @@ type Repository interface {
 	Rewrite(key string, value gauge)
 }
 
-type fileStorage struct {
-	file   *os.File
-	writer *bufio.Writer
-	config config.Config
-	buff   map[string]interface{}
-}
-
 type MemStorage struct {
-	buffer  map[string]interface{}
-	backend fileStorage
+	buffer map[string]interface{}
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -67,8 +57,7 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 func NewMemStorage(storConfig config.Config, opts ...Option) *MemStorage {
 	buffer := make(map[string]interface{})
 	ms := &MemStorage{
-		buffer:  buffer,
-		backend: newBackend(storConfig, buffer),
+		buffer: buffer,
 	}
 
 	for _, opt := range opts {

@@ -7,17 +7,25 @@ import (
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
+	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
-func newBackend(backConf config.Config, buff map[string]interface{}) fileStorage {
+type fileStorage struct {
+	file    *os.File
+	writer  *bufio.Writer
+	config  config.Config
+	storage storage.Repository
+}
+
+func NewBackend(backConf config.Config, stor storage.Repository) fileStorage {
 	fs := fileStorage{}
 	if backConf.StoreFile == "" {
 		return fs
 	}
 	var err error
 	fs.config = backConf
-	fs.buff = buff
+	fs.storage = stor
 	fs.file, err = os.OpenFile(backConf.StoreFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		panic(err)
@@ -40,12 +48,6 @@ func (fs *fileStorage) Restore() error {
 	metrics := make([]types.Metric, 0)
 	err = json.Unmarshal(data, &metrics)
 	for _, metric := range metrics {
-		switch metric.MType {
-		case "gauge":
-			fs.buff[metric.ID] = metric.Value
-		case "counter":
-			fs.buff[metric.ID] = metric.Delta
-		}
 	}
 
 	return err
