@@ -55,6 +55,9 @@ func (cfg *Config) NewServer() error {
 	if cfg.StoreInterval, err = parseInterval(envs.StoreInterval); err != nil {
 		return err
 	}
+	if cfg.ReportInterval, err = parseInterval(envs.ReportInterval); err != nil {
+		return err
+	}
 	cfg.StoreFile = envs.StoreFile
 	cfg.IsRestore = envs.IsRestore
 

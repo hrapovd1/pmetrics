@@ -41,10 +41,11 @@ func TestConfig_NewServer(t *testing.T) {
 		{
 			name: "Server config",
 			fields: Config{
-				ServerAddress: "localhost:8080",
-				StoreInterval: 300 * time.Second,
-				StoreFile:     "/tmp/devops-metrics-db.json",
-				IsRestore:     true,
+				ServerAddress:  "localhost:8080",
+				ReportInterval: 10 * time.Second,
+				StoreInterval:  300 * time.Second,
+				StoreFile:      "/tmp/devops-metrics-db.json",
+				IsRestore:      true,
 			},
 		},
 	}

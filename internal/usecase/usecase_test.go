@@ -31,7 +31,7 @@ func TestWriteJSONMetric(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
-	locStorage := storage.NewMemStorage(, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := WriteJSONMetric(locStorage, tt.data)

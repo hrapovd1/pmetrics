@@ -18,9 +18,15 @@ func main() {
 	if err := serverConf.NewServer(); err != nil {
 		logger.Fatalln(err)
 	}
+	backendStorage := storage.NewBackend(serverConf)
 	handlersStorage := handlers.MetricStorage{
-		Storage: storage.NewMemStorage(serverConf),
+		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
 	}
+
+	donech := make(chan struct{})
+	defer close(donech)
+
+	go backendStorage.Storing(donech, logger)
 
 	router := chi.NewRouter()
 	router.Get("/", handlersStorage.GetAllHandler)

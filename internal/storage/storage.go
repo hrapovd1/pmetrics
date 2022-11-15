@@ -3,7 +3,6 @@ package storage
 import (
 	"strconv"
 
-	"github.com/hrapovd1/pmetrics/internal/config"
 	"golang.org/x/exp/maps"
 )
 
@@ -18,7 +17,8 @@ type Repository interface {
 }
 
 type MemStorage struct {
-	buffer map[string]interface{}
+	buffer  map[string]interface{}
+	backend *FileStorage
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -54,7 +54,7 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
 }
 
-func NewMemStorage(storConfig config.Config, opts ...Option) *MemStorage {
+func NewMemStorage(opts ...Option) *MemStorage {
 	buffer := make(map[string]interface{})
 	ms := &MemStorage{
 		buffer: buffer,
@@ -70,6 +70,14 @@ func NewMemStorage(storConfig config.Config, opts ...Option) *MemStorage {
 func WithBuffer(buffer map[string]interface{}) Option {
 	return func(mem *MemStorage) *MemStorage {
 		mem.buffer = buffer
+		return mem
+	}
+}
+
+func WithBackend(backend *FileStorage) Option {
+	return func(mem *MemStorage) *MemStorage {
+		mem.backend = backend
+		mem.backend.buff = mem.buffer
 		return mem
 	}
 }
