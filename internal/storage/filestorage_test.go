@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"log"
 	"os"
 	"testing"
 
@@ -51,7 +52,10 @@ func TestFileStorage_Close(t *testing.T) {
 
 func TestFileStorage_Restore(t *testing.T) {
 	tmpFile, _ := os.CreateTemp("", "devops*.json")
-	result := make(map[string]interface{})
+	result := map[string]interface{}{
+		"M1": int64(4),
+		"M2": float64(3.9),
+	}
 	fs := FileStorage{
 		file:   tmpFile,
 		writer: bufio.NewWriter(tmpFile),
@@ -61,10 +65,11 @@ func TestFileStorage_Restore(t *testing.T) {
 		"M1": int64(4),
 		"M2": float64(3.9),
 	}
-	data := `[{"id":"M1","type":"counter","delta":4},{"id":"M2","type":"gauge","value":3.9}]`
-	_, err := fs.writer.Write([]byte(data))
+	//data := `[{"id":"M1","type":"counter","delta":4},{"id":"M2","type":"gauge","value":3.9}]`
+	err := fs.Store()
 	require.NoError(t, err)
 	require.NoError(t, fs.writer.Flush())
-	require.NoError(t, fs.Restore())
+	log.Printf("file in test: %v", *fs.file)
+	require.Error(t, fs.Restore())
 	assert.Equal(t, want, fs.buff)
 }

@@ -20,12 +20,12 @@ type environ struct {
 }
 
 type Flags struct {
-	ADDRESS         string
-	POLL_INTERVAL   string
-	REPORT_INTERVAL string
-	RESTORE         bool
-	STORE_FILE      string
-	STORE_INTERVAL  string
+	address        string
+	pollInterval   string
+	reportInterval string
+	restore        bool
+	storeFile      string
+	storeInterval  string
 }
 
 type Config struct {
@@ -45,19 +45,19 @@ func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
 
 func GetServerFlags() Flags {
 	flags := Flags{}
-	flag.StringVar(&flags.ADDRESS, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.BoolVar(&flags.RESTORE, "r", true, "Restore last data from file, true/false")
-	flag.StringVar(&flags.STORE_INTERVAL, "i", "", "Interval of write to file in seconds, for example: 30s")
-	flag.StringVar(&flags.STORE_FILE, "f", "", "File where server keep data, for example: /tmp/server.json")
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
+	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
+	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
 	flag.Parse()
 	return flags
 }
 
 func GetAgentFlags() Flags {
 	flags := Flags{}
-	flag.StringVar(&flags.ADDRESS, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.StringVar(&flags.REPORT_INTERVAL, "r", "", "Interval of sent data to server in seconds, for example: 30s")
-	flag.StringVar(&flags.POLL_INTERVAL, "p", "", "Interval of query metrics in seconds, for example: 30s")
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
+	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
 	flag.Parse()
 	return flags
 }
@@ -72,8 +72,8 @@ func NewAgent(flags Flags) (*Config, error) {
 	}
 	// Определяю интервал опроса метрик
 	var pollInterval string
-	if flags.POLL_INTERVAL != "" && cfg.tagsDefault["POLL_INTERVAL"] {
-		pollInterval = flags.POLL_INTERVAL
+	if flags.pollInterval != "" && cfg.tagsDefault["POLL_INTERVAL"] {
+		pollInterval = flags.pollInterval
 	} else {
 		pollInterval = envs.PollInterval
 	}
@@ -82,8 +82,8 @@ func NewAgent(flags Flags) (*Config, error) {
 	}
 	// Определяю интервал отправки метрик
 	var reportInterval string
-	if flags.REPORT_INTERVAL != "" && cfg.tagsDefault["REPORT_INTERVAL"] {
-		reportInterval = flags.REPORT_INTERVAL
+	if flags.reportInterval != "" && cfg.tagsDefault["REPORT_INTERVAL"] {
+		reportInterval = flags.reportInterval
 	} else {
 		reportInterval = envs.ReportInterval
 	}
@@ -91,8 +91,8 @@ func NewAgent(flags Flags) (*Config, error) {
 		return nil, err
 	}
 	// Определяю адрес сервера
-	if flags.ADDRESS != "" && cfg.tagsDefault["ADDRESS"] {
-		cfg.ServerAddress = flags.ADDRESS
+	if flags.address != "" && cfg.tagsDefault["ADDRESS"] {
+		cfg.ServerAddress = flags.address
 	} else {
 		cfg.ServerAddress = envs.Address
 	}
@@ -110,15 +110,15 @@ func NewServer(flags Flags) (*Config, error) {
 		return nil, err
 	}
 	// Определяю адрес сервера
-	if flags.ADDRESS != "" && cfg.tagsDefault["ADDRESS"] {
-		cfg.ServerAddress = flags.ADDRESS
+	if flags.address != "" && cfg.tagsDefault["ADDRESS"] {
+		cfg.ServerAddress = flags.address
 	} else {
 		cfg.ServerAddress = envs.Address
 	}
 	// Определяю интервал сохранения в файл
 	var storeInterval string
-	if flags.STORE_INTERVAL != "" && cfg.tagsDefault["STORE_INTERVAL"] {
-		storeInterval = flags.STORE_INTERVAL
+	if flags.storeInterval != "" && cfg.tagsDefault["STORE_INTERVAL"] {
+		storeInterval = flags.storeInterval
 	} else {
 		storeInterval = envs.StoreInterval
 	}
@@ -130,14 +130,14 @@ func NewServer(flags Flags) (*Config, error) {
 		return nil, err
 	}
 	// Определяю файл для хранения метрик
-	if flags.STORE_FILE != "" && cfg.tagsDefault["STORE_FILE"] {
-		cfg.StoreFile = flags.STORE_FILE
+	if flags.storeFile != "" && cfg.tagsDefault["STORE_FILE"] {
+		cfg.StoreFile = flags.storeFile
 	} else {
 		cfg.StoreFile = envs.StoreFile
 	}
 	// Определяю флаг восстановления метрик при запуске
 	if cfg.tagsDefault["RESTORE"] {
-		cfg.IsRestore = flags.RESTORE
+		cfg.IsRestore = flags.restore
 	} else {
 		cfg.IsRestore = envs.IsRestore
 	}

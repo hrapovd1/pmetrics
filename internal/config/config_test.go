@@ -20,12 +20,23 @@ func TestConfig_NewAgent(t *testing.T) {
 				ReportInterval: 10 * time.Second,
 				RetryCount:     3,
 				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewAgent()
+			cfg, err := NewAgent(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})
@@ -44,13 +55,21 @@ func TestConfig_NewServer(t *testing.T) {
 				ReportInterval: 10 * time.Second,
 				StoreInterval:  300 * time.Second,
 				StoreFile:      "/tmp/devops-metrics-db.json",
-				IsRestore:      true,
+				IsRestore:      false,
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewServer()
+			cfg, err := NewServer(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})
