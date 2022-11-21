@@ -13,13 +13,14 @@ import (
 )
 
 func main() {
-	var serverConf config.Config
 	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
-	if err := serverConf.NewServer(); err != nil {
+	// Чтение флагов и установка конфигурации сервера
+	serverConf, err := config.NewServer(config.GetServerFlags())
+	if err != nil {
 		logger.Fatalln(err)
 	}
-	backendStorage := storage.NewBackend(serverConf)
-	handlersStorage := handlers.MetricStorage{
+	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
+	handlersStorage := handlers.MetricStorage{        // Хранилище метрик
 		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
 	}
 
@@ -41,6 +42,6 @@ func main() {
 
 	router.Mount("/update", update)
 
-	log.Println("Server start on ", serverConf.ServerAddress)
-	log.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
+	logger.Println("Server start on ", serverConf.ServerAddress)
+	logger.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
 }

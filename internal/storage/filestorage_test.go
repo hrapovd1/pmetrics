@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bufio"
+	"os"
 	"testing"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
@@ -22,15 +24,15 @@ func TestNewBackend(t *testing.T) {
 
 func TestFileStorage_Close(t *testing.T) {
 	var conf config.Config
-	var conf2 config.Config
-	require.NoError(t, conf2.NewServer())
+	conf2, err := config.NewServer(config.Flags{})
+	require.NoError(t, err)
 	tests := []struct {
 		name string
 		cfg  config.Config
 		want bool
 	}{
 		{name: "With error", cfg: conf, want: true},
-		{name: "NO erro", cfg: conf2, want: false},
+		{name: "NO erro", cfg: *conf2, want: false},
 	}
 
 	for _, test := range tests {
@@ -45,4 +47,24 @@ func TestFileStorage_Close(t *testing.T) {
 		})
 	}
 
+}
+
+func TestFileStorage_Restore(t *testing.T) {
+	tmpFile, _ := os.CreateTemp("", "devops*.json")
+	result := make(map[string]interface{})
+	fs := FileStorage{
+		file:   tmpFile,
+		writer: bufio.NewWriter(tmpFile),
+		buff:   result,
+	}
+	want := map[string]interface{}{
+		"M1": int64(4),
+		"M2": float64(3.9),
+	}
+	data := `[{"id":"M1","type":"counter","delta":4},{"id":"M2","type":"gauge","value":3.9}]`
+	_, err := fs.writer.Write([]byte(data))
+	require.NoError(t, err)
+	require.NoError(t, fs.writer.Flush())
+	require.NoError(t, fs.Restore())
+	assert.Equal(t, want, fs.buff)
 }

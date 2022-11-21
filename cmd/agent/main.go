@@ -18,9 +18,9 @@ type gauge float64
 type counter int64
 
 func main() {
-	var agentConf config.Config
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
-	if err := agentConf.NewAgent(); err != nil {
+	agentConf, err := config.NewAgent(config.GetAgentFlags())
+	if err != nil {
 		logger.Fatalln(err)
 	}
 	pollTick := time.NewTicker(agentConf.PollInterval)

@@ -25,10 +25,9 @@ func TestConfig_NewAgent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var cfg Config
-			err := cfg.NewAgent()
+			cfg, err := NewAgent()
 			require.NoError(t, err)
-			assert.Equal(t, tt.fields, cfg)
+			assert.Equal(t, tt.fields, *cfg)
 		})
 	}
 }
@@ -51,10 +50,9 @@ func TestConfig_NewServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var cfg Config
-			err := cfg.NewServer()
+			cfg, err := NewServer()
 			require.NoError(t, err)
-			assert.Equal(t, tt.fields, cfg)
+			assert.Equal(t, tt.fields, *cfg)
 		})
 	}
 }
