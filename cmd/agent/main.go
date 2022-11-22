@@ -23,7 +23,6 @@ func main() {
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	logger.Print(agentConf)
 	pollTick := time.NewTicker(agentConf.PollInterval)
 	reportTick := time.NewTicker(agentConf.ReportInterval)
 	httpClient := resty.New().SetRetryCount(agentConf.RetryCount)
