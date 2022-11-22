@@ -210,6 +210,7 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
 	err = indexTmplt.Execute(rw, outTable)
 	if err != nil {
