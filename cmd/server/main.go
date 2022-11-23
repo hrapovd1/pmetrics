@@ -30,15 +30,16 @@ func main() {
 	go backendStorage.Storing(donech, logger)
 
 	router := chi.NewRouter()
-	router.Get("/", handlers.GzipMiddle(handlersStorage.GetAllHandler))
-	router.Get("/value/*", handlers.GzipMiddle(handlersStorage.GetMetricHandler))
-	router.Post("/value/", handlers.GzipMiddle(handlersStorage.GetMetricJSONHandler))
+	router.Use(handlers.GzipMiddle)
+	router.Get("/", handlersStorage.GetAllHandler)
+	router.Get("/value/*", handlersStorage.GetMetricHandler)
+	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
 
 	update := chi.NewRouter()
-	update.Post("/gauge/*", handlers.GzipMiddle(handlersStorage.GaugeHandler))
-	update.Post("/counter/*", handlers.GzipMiddle(handlersStorage.CounterHandler))
-	update.Post("/", handlers.GzipMiddle(handlersStorage.UpdateHandler))
-	update.Post("/*", handlers.GzipMiddle(handlers.NotImplementedHandler))
+	update.Post("/gauge/*", handlersStorage.GaugeHandler)
+	update.Post("/counter/*", handlersStorage.CounterHandler)
+	update.Post("/", handlersStorage.UpdateHandler)
+	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)
 
