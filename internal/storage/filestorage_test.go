@@ -25,7 +25,7 @@ func TestNewBackend(t *testing.T) {
 
 func TestFileStorage_Close(t *testing.T) {
 	var conf config.Config
-	conf2, err := config.NewServer(config.Flags{})
+	conf2, err := config.NewServerConf(config.Flags{})
 	require.NoError(t, err)
 	tests := []struct {
 		name string

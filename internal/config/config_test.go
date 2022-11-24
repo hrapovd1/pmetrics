@@ -18,7 +18,6 @@ func TestConfig_NewAgent(t *testing.T) {
 			fields: Config{
 				PollInterval:   2 * time.Second,
 				ReportInterval: 10 * time.Second,
-				RetryCount:     3,
 				ServerAddress:  "localhost:8080",
 				StoreInterval:  0,
 				StoreFile:      "",
@@ -36,7 +35,7 @@ func TestConfig_NewAgent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewAgent(Flags{})
+			cfg, err := NewAgentConf(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})
@@ -69,7 +68,7 @@ func TestConfig_NewServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewServer(Flags{})
+			cfg, err := NewServerConf(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})

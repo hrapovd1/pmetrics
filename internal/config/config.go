@@ -31,7 +31,6 @@ type Flags struct {
 type Config struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
-	RetryCount     int
 	ServerAddress  string
 	StoreInterval  time.Duration
 	StoreFile      string
@@ -62,7 +61,7 @@ func GetAgentFlags() Flags {
 	return flags
 }
 
-func NewAgent(flags Flags) (*Config, error) {
+func NewAgentConf(flags Flags) (*Config, error) {
 	var cfg Config
 	cfg.tagsDefault = make(map[string]bool)
 	var err error
@@ -96,11 +95,10 @@ func NewAgent(flags Flags) (*Config, error) {
 	} else {
 		cfg.ServerAddress = envs.Address
 	}
-	cfg.RetryCount = 3
 	return &cfg, err
 }
 
-func NewServer(flags Flags) (*Config, error) {
+func NewServerConf(flags Flags) (*Config, error) {
 	var err error
 	var cfg Config
 	cfg.tagsDefault = make(map[string]bool)

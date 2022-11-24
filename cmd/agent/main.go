@@ -19,13 +19,13 @@ type counter int64
 
 func main() {
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
-	agentConf, err := config.NewAgent(config.GetAgentFlags())
+	agentConf, err := config.NewAgentConf(config.GetAgentFlags())
 	if err != nil {
 		logger.Fatalln(err)
 	}
 	pollTick := time.NewTicker(agentConf.PollInterval)
 	reportTick := time.NewTicker(agentConf.ReportInterval)
-	httpClient := resty.New().SetRetryCount(agentConf.RetryCount)
+	httpClient := resty.New()
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 28)
 	metricURL := "http://" + agentConf.ServerAddress + "/update/"
@@ -49,7 +49,6 @@ func main() {
 					Post(metricURL)
 				if err != nil {
 					logger.Print("Error when sent metric. ", err)
-					return
 				}
 			}
 			data, err := metricToJSON("PollCount", PollCount)
@@ -62,7 +61,6 @@ func main() {
 				Post(metricURL)
 			if err != nil {
 				logger.Print("Error when sent metric. ", err)
-				return
 			}
 		}
 	}

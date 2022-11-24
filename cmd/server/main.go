@@ -15,7 +15,7 @@ import (
 func main() {
 	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
 	// Чтение флагов и установка конфигурации сервера
-	serverConf, err := config.NewServer(config.GetServerFlags())
+	serverConf, err := config.NewServerConf(config.GetServerFlags())
 	if err != nil {
 		logger.Fatalln(err)
 	}
