@@ -17,6 +17,7 @@ type environ struct {
 	Address        string `env:"ADDRESS" envDefault:"localhost:8080"`
 	StoreFile      string `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
 	IsRestore      bool   `env:"RESTORE" envDefault:"true"`
+	Key            string `env:"KEY" envDefault:""`
 }
 
 type Flags struct {
@@ -26,6 +27,7 @@ type Flags struct {
 	restore        bool
 	storeFile      string
 	storeInterval  string
+	key            string
 }
 
 type Config struct {
@@ -36,6 +38,7 @@ type Config struct {
 	StoreInterval  time.Duration
 	StoreFile      string
 	IsRestore      bool
+	Key            string
 	tagsDefault    map[string]bool
 }
 
@@ -49,6 +52,7 @@ func GetServerFlags() Flags {
 	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
 	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
 	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
 	flag.Parse()
 	return flags
 }
@@ -58,6 +62,7 @@ func GetAgentFlags() Flags {
 	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
 	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
 	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
 	flag.Parse()
 	return flags
 }
@@ -95,6 +100,12 @@ func NewAgentConf(flags Flags) (*Config, error) {
 		cfg.ServerAddress = flags.address
 	} else {
 		cfg.ServerAddress = envs.Address
+	}
+	// Определяю ключ для подписи метрик
+	if cfg.tagsDefault["KEY"] {
+		cfg.Key = flags.key
+	} else {
+		cfg.Key = envs.Key
 	}
 	return &cfg, err
 }
@@ -139,6 +150,12 @@ func NewServerConf(flags Flags) (*Config, error) {
 		cfg.IsRestore = flags.restore
 	} else {
 		cfg.IsRestore = envs.IsRestore
+	}
+	// Определяю ключ для подписи метрик
+	if cfg.tagsDefault["KEY"] {
+		cfg.Key = flags.key
+	} else {
+		cfg.Key = envs.Key
 	}
 
 	return &cfg, err

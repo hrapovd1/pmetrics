@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
@@ -21,6 +22,7 @@ const (
 
 type MetricStorage struct {
 	Storage storage.Repository
+	Config  config.Config
 }
 
 func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
@@ -37,6 +39,14 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// check metric hash in data.
+	if ms.Config.Key != "" {
+		if !usecase.IsSignEqual(data, ms.Config.Key) {
+			http.Error(rw, "sign metric is bad", http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Write new metrics value
 	err = usecase.WriteJSONMetric(ms.Storage.(*storage.MemStorage), data)
 	if err != nil {
@@ -49,6 +59,15 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// sign metric with hash in data.
+	if ms.Config.Key != "" {
+		err := usecase.SignData(&data, ms.Config.Key)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp, err := json.Marshal(data)
@@ -83,6 +102,15 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 	if err = usecase.GetJSONMetric(ms.Storage.(*storage.MemStorage), &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
+	}
+
+	// sign metric with hash in data.
+	if ms.Config.Key != "" {
+		err := usecase.SignData(&data, ms.Config.Key)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	resp, err := json.Marshal(data)

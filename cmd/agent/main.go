@@ -12,6 +12,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/types"
+	"github.com/hrapovd1/pmetrics/internal/usecase"
 )
 
 type gauge float64
@@ -39,7 +40,7 @@ func main() {
 			pollMetrics(metrics)
 		case <-reportTick.C:
 			for k, v := range metrics {
-				data, err := metricToJSON(k, v)
+				data, err := metricToJSON(k, v, agentConf.Key)
 				if err != nil {
 					logger.Fatalln(err)
 				}
@@ -51,7 +52,7 @@ func main() {
 					logger.Print("Error when sent metric. ", err)
 				}
 			}
-			data, err := metricToJSON("PollCount", PollCount)
+			data, err := metricToJSON("PollCount", PollCount, agentConf.Key)
 			if err != nil {
 				logger.Fatalln(err)
 			}
@@ -99,28 +100,36 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["RandomValue"] = gauge(rand.Float64())
 }
 
-func metricToJSON(name string, val interface{}) ([]byte, error) {
+func metricToJSON(name string, val interface{}, key string) ([]byte, error) {
 	var value float64
 	var delta int64
 	switch val := val.(type) {
 	case gauge:
 		value = float64(val)
-		return json.Marshal(
-			types.Metric{
-				ID:    name,
-				MType: "gauge",
-				Value: &value,
-			},
-		)
+		data := types.Metric{
+			ID:    name,
+			MType: "gauge",
+			Value: &value,
+		}
+		if key != "" {
+			if err := usecase.SignData(&data, key); err != nil {
+				return nil, err
+			}
+		}
+		return json.Marshal(data)
 	case counter:
 		delta = int64(val)
-		return json.Marshal(
-			types.Metric{
-				ID:    name,
-				MType: "counter",
-				Delta: &delta,
-			},
-		)
+		data := types.Metric{
+			ID:    name,
+			MType: "counter",
+			Delta: &delta,
+		}
+		if key != "" {
+			if err := usecase.SignData(&data, key); err != nil {
+				return nil, err
+			}
+		}
+		return json.Marshal(data)
 	}
 	return nil, errors.New("got undefined metric type")
 }

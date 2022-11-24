@@ -22,8 +22,10 @@ func TestConfig_NewAgent(t *testing.T) {
 				StoreInterval:  0,
 				StoreFile:      "",
 				IsRestore:      false,
+				Key:            "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"KEY":             true,
 					"POLL_INTERVAL":   true,
 					"REPORT_INTERVAL": true,
 					"RESTORE":         true,
@@ -55,8 +57,10 @@ func TestConfig_NewServer(t *testing.T) {
 				StoreInterval:  300 * time.Second,
 				StoreFile:      "/tmp/devops-metrics-db.json",
 				IsRestore:      false,
+				Key:            "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"KEY":             true,
 					"POLL_INTERVAL":   true,
 					"REPORT_INTERVAL": true,
 					"RESTORE":         true,

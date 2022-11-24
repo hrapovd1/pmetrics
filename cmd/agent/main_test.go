@@ -83,11 +83,11 @@ func Test_metricToJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.metric.isGauge {
-				got, err := metricToJSON(tt.metric.name, tt.metric.val)
+				got, err := metricToJSON(tt.metric.name, tt.metric.val, "")
 				require.NoError(t, err)
 				assert.True(t, reflect.DeepEqual(got, tt.want))
 			} else {
-				got, err := metricToJSON(tt.metric.name, tt.metric.del)
+				got, err := metricToJSON(tt.metric.name, tt.metric.del, "")
 				require.NoError(t, err)
 				assert.True(t, reflect.DeepEqual(got, tt.want))
 			}

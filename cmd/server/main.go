@@ -22,6 +22,7 @@ func main() {
 	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
 	handlersStorage := handlers.MetricStorage{        // Хранилище метрик
 		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
+		Config:  *serverConf,
 	}
 
 	donech := make(chan struct{})
