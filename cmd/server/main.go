@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,24 +12,37 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
 
-var handlersStorage = handlers.MetricStorage{
-	Storage: storage.NewMemStorage(),
-}
-
 func main() {
-	serverAddr := fmt.Sprint(config.ServerConfig.ServerAddress, ":", config.ServerConfig.ServerPort)
+	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
+	// Чтение флагов и установка конфигурации сервера
+	serverConf, err := config.NewServer(config.GetServerFlags())
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
+	handlersStorage := handlers.MetricStorage{        // Хранилище метрик
+		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
+	}
+
+	donech := make(chan struct{})
+	defer close(donech)
+
+	go backendStorage.Storing(donech, logger)
 
 	router := chi.NewRouter()
+	router.Use(handlers.GzipMiddle)
 	router.Get("/", handlersStorage.GetAllHandler)
 	router.Get("/value/*", handlersStorage.GetMetricHandler)
+	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
 
 	update := chi.NewRouter()
 	update.Post("/gauge/*", handlersStorage.GaugeHandler)
 	update.Post("/counter/*", handlersStorage.CounterHandler)
+	update.Post("/", handlersStorage.UpdateHandler)
 	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)
 
-	log.Println("Server start on ", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, router))
+	logger.Println("Server start on ", serverConf.ServerAddress)
+	logger.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
 }

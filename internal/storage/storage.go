@@ -17,7 +17,8 @@ type Repository interface {
 }
 
 type MemStorage struct {
-	buffer map[string]interface{}
+	buffer  map[string]interface{}
+	backend *FileStorage
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -54,8 +55,9 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 }
 
 func NewMemStorage(opts ...Option) *MemStorage {
+	buffer := make(map[string]interface{})
 	ms := &MemStorage{
-		buffer: make(map[string]interface{}),
+		buffer: buffer,
 	}
 
 	for _, opt := range opts {
@@ -72,6 +74,14 @@ func WithBuffer(buffer map[string]interface{}) Option {
 	}
 }
 
+func WithBackend(backend *FileStorage) Option {
+	return func(mem *MemStorage) *MemStorage {
+		mem.backend = backend
+		mem.backend.buff = mem.buffer
+		return mem
+	}
+}
+
 func StrToGauge(input string) (gauge, error) {
 	out, err := strconv.ParseFloat(input, 64)
 	return gauge(out), err
@@ -80,4 +90,12 @@ func StrToGauge(input string) (gauge, error) {
 func StrToCounter(input string) (counter, error) {
 	out, err := strconv.ParseInt(input, 10, 64)
 	return counter(out), err
+}
+
+func ToGauge(input float64) gauge {
+	return gauge(input)
+}
+
+func ToCounter(input int64) counter {
+	return counter(input)
 }

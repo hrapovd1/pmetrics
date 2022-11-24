@@ -172,21 +172,6 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 	})
 }
 
-func TestNotImplementedHandler(t *testing.T) {
-	reqst := httptest.NewRequest(http.MethodPost, "/update/any/", nil)
-	rec := httptest.NewRecorder()
-	hndl := http.HandlerFunc(NotImplementedHandler)
-	hndl.ServeHTTP(rec, reqst)
-
-	t.Run("Check not implemented", func(t *testing.T) {
-		result := rec.Result()
-		defer result.Body.Close()
-		_, err := io.ReadAll(result.Body)
-		assert.Nil(t, err)
-		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
-	})
-}
-
 func TestMetricStorage_GetAllHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
@@ -309,4 +294,19 @@ func TestMetricStorage_GetMetricHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNotImplementedHandler(t *testing.T) {
+	reqst := httptest.NewRequest(http.MethodPost, "/update/any/", nil)
+	rec := httptest.NewRecorder()
+	hndl := http.HandlerFunc(NotImplementedHandler)
+	hndl.ServeHTTP(rec, reqst)
+
+	t.Run("Check not implemented", func(t *testing.T) {
+		result := rec.Result()
+		defer result.Body.Close()
+		_, err := io.ReadAll(result.Body)
+		assert.Nil(t, err)
+		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
+	})
 }

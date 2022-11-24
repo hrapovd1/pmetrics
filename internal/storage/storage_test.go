@@ -141,82 +141,42 @@ func TestMemStorage_GetAll(t *testing.T) {
 	})
 }
 
-func TestStrToGauge(t *testing.T) {
+func TestToGauge(t *testing.T) {
 	tests := []struct {
-		name     string
-		positive bool
-		value    string
-		want     gauge
+		name  string
+		value float64
+		want  gauge
 	}{
 		{
-			name:     "Float value",
-			positive: true,
-			value:    "1.0",
-			want:     gauge(1.0),
-		},
-		{
-			name:     "Int value",
-			positive: true,
-			value:    "1",
-			want:     gauge(1.0),
-		},
-		{
-			name:     "Wrong value",
-			positive: false,
-			value:    "a",
-			want:     gauge(1.0),
+			name:  "Float value",
+			value: float64(1.0),
+			want:  gauge(1.0),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.positive {
-				value, err := StrToGauge(test.value)
-				assert.Nil(t, err)
-				assert.Equal(t, test.want, value)
-			} else {
-				_, err := StrToGauge(test.value)
-				assert.NotNil(t, err)
-			}
+			value := ToGauge(test.value)
+			assert.Equal(t, test.want, value)
 		})
 	}
 }
 
-func TestStrToCounter(t *testing.T) {
+func TestToCounter(t *testing.T) {
 	tests := []struct {
-		name     string
-		positive bool
-		value    string
-		want     counter
+		name  string
+		value int64
+		want  counter
 	}{
 		{
-			name:     "Float value",
-			positive: false,
-			value:    "1.0",
-			want:     counter(1),
-		},
-		{
-			name:     "Int value",
-			positive: true,
-			value:    "-0",
-			want:     counter(0),
-		},
-		{
-			name:     "Wrong value",
-			positive: false,
-			value:    "a",
-			want:     counter(0),
+			name:  "Int value",
+			value: int64(-0),
+			want:  counter(0),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.positive {
-				value, err := StrToCounter(test.value)
-				assert.Nil(t, err)
-				assert.Equal(t, test.want, value)
-			} else {
-				_, err := StrToCounter(test.value)
-				assert.NotNil(t, err)
-			}
+			value := ToCounter(test.value)
+			assert.Equal(t, test.want, value)
 		})
 	}
 }

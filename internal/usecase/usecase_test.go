@@ -6,9 +6,89 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWriteJSONMetric(t *testing.T) {
+	M1 := int64(5)
+	M2 := float64(-4.65)
+	tests := []struct {
+		name string
+		data types.Metric
+		want string
+	}{
+		{
+			name: "M1",
+			data: types.Metric{ID: "M1", MType: "counter", Delta: &M1},
+			want: "5",
+		},
+		{
+			name: "M2",
+			data: types.Metric{ID: "M2", MType: "gauge", Value: &M2},
+			want: "-4.65",
+		},
+	}
+	stor := make(map[string]interface{})
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := WriteJSONMetric(locStorage, tt.data)
+			require.NoError(t, err)
+			switch result := locStorage.Get(tt.data.ID).(type) {
+			case int64:
+				assert.Equal(t, tt.want, fmt.Sprint(result))
+			case float64:
+				assert.Equal(t, tt.want, fmt.Sprint(result))
+			}
+		})
+	}
+}
+
+func TestGetJSONMetric(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    types.Metric
+		withErr bool
+		want    string
+	}{
+		{
+			name:    "M1",
+			data:    types.Metric{ID: "M1", MType: "counter"},
+			withErr: false,
+			want:    "5",
+		},
+		{
+			name:    "M2",
+			data:    types.Metric{ID: "M2", MType: "gauge"},
+			withErr: false,
+			want:    "-4.65",
+		},
+		{
+			name:    "M3",
+			data:    types.Metric{ID: "M3", MType: "type"},
+			withErr: true,
+			want:    "<nil>",
+		},
+	}
+	stor := make(map[string]interface{})
+	stor["M1"] = int64(5)
+	stor["M2"] = float64(-4.65)
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := GetJSONMetric(locStorage, &tt.data)
+			if tt.withErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, fmt.Sprint(stor[tt.data.ID]))
+		})
+	}
+}
 
 func TestWriteMetric(t *testing.T) {
 	tests := []struct {

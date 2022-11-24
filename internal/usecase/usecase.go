@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
 const (
@@ -55,6 +56,47 @@ func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
 		err = errors.New("undefined metric type")
 	}
 	return metricValue, err
+}
+
+func WriteJSONMetric(ms *storage.MemStorage, data types.Metric) error {
+	switch data.MType {
+	case "gauge":
+		metricValue := storage.ToGauge(*data.Value)
+		ms.Rewrite(data.ID, metricValue)
+		return nil
+	case "counter":
+		metricValue := storage.ToCounter(*data.Delta)
+		ms.Append(data.ID, metricValue)
+		return nil
+	default:
+		return errors.New("undefined metric type")
+	}
+}
+
+func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
+	var err error
+
+	switch data.MType {
+	case "gauge":
+		val := ms.Get(data.ID)
+		if val == nil {
+			return errors.New("not found")
+		}
+		value := val.(float64)
+		data.Value = &value
+		err = nil
+	case "counter":
+		val := ms.Get(data.ID)
+		if val == nil {
+			return errors.New("not found")
+		}
+		value := val.(int64)
+		data.Delta = &value
+		err = nil
+	default:
+		err = errors.New("undefined metric type")
+	}
+	return err
 }
 
 func GetTableMetrics(ms *storage.MemStorage) map[string]string {
