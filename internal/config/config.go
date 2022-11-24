@@ -31,6 +31,7 @@ type Flags struct {
 type Config struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
+	RetryCount     int
 	ServerAddress  string
 	StoreInterval  time.Duration
 	StoreFile      string
