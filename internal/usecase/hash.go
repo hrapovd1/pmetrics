@@ -13,14 +13,14 @@ import (
 func SignData(data *types.Metric, key string) error {
 	h := hmac.New(sha256.New, []byte(key))
 	if data.MType == "counter" {
-		_, err := h.Write([]byte(fmt.Sprintf("%s:counter:%d", data.ID, *data.Delta)))
+		_, err := h.Write([]byte(fmt.Sprintf("%s:%s:%d", data.ID, data.MType, *data.Delta)))
 		if err != nil {
 			return err
 		}
-		data.Hash = string(h.Sum(nil))
+		data.Hash = fmt.Sprintf("%x", h.Sum(nil))
 		return nil
 	} else if data.MType == "gauge" {
-		_, err := h.Write([]byte(fmt.Sprintf("%s:gauge:%f", data.ID, *data.Value)))
+		_, err := h.Write([]byte(fmt.Sprintf("%s:%s:%f", data.ID, data.MType, *data.Value)))
 		if err != nil {
 			return err
 		}
