@@ -18,6 +18,7 @@ type environ struct {
 	StoreFile      string `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
 	IsRestore      bool   `env:"RESTORE" envDefault:"true"`
 	Key            string `env:"KEY" envDefault:""`
+	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 }
 
 type Flags struct {
@@ -28,6 +29,7 @@ type Flags struct {
 	storeFile      string
 	storeInterval  string
 	key            string
+	dbDSN          string
 }
 
 type Config struct {
@@ -39,6 +41,7 @@ type Config struct {
 	StoreFile      string
 	IsRestore      bool
 	Key            string
+	DatabaseDSN    string
 	tagsDefault    map[string]bool
 }
 
@@ -53,6 +56,7 @@ func GetServerFlags() Flags {
 	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
 	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.StringVar(&flags.dbDSN, "d", "", "Database connect address, for example: postgres://username:password@localhost:5432/database_name")
 	flag.Parse()
 	return flags
 }
@@ -156,6 +160,12 @@ func NewServerConf(flags Flags) (*Config, error) {
 		cfg.Key = flags.key
 	} else {
 		cfg.Key = envs.Key
+	}
+	// Определяю подключение к БД
+	if cfg.tagsDefault["DATABASE_DSN"] {
+		cfg.DatabaseDSN = flags.dbDSN
+	} else {
+		cfg.DatabaseDSN = envs.DatabaseDSN
 	}
 
 	return &cfg, err

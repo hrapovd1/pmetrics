@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -153,7 +152,6 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		hndl.ServeHTTP(rec, reqst)
 
 		t.Run(test.name, func(t *testing.T) {
-			log.Println(test.name, " ", test.path)
 			result := rec.Result()
 			defer result.Body.Close()
 			_, err := io.ReadAll(result.Body)

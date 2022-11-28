@@ -2,7 +2,6 @@ package storage
 
 import (
 	"bufio"
-	"log"
 	"os"
 	"testing"
 
@@ -69,7 +68,6 @@ func TestFileStorage_Restore(t *testing.T) {
 	err := fs.Store()
 	require.NoError(t, err)
 	require.NoError(t, fs.writer.Flush())
-	log.Printf("file in test: %v", *fs.file)
 	require.Error(t, fs.Restore())
 	assert.Equal(t, want, fs.buff)
 }

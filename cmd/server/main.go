@@ -19,10 +19,18 @@ func main() {
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
-	handlersStorage := handlers.MetricStorage{        // Хранилище метрик
-		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
-		Config:  *serverConf,
+	backendStorage := storage.NewBackend(*serverConf)          // Файловый бекенд хранилища метрик
+	backendStorageDB, err := storage.NewDbStorage(*serverConf) // БД для метрик
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	defer backendStorageDB.Close()
+	handlersStorage := handlers.MetricStorage{ // Хранилище метрик
+		Storage: storage.NewMemStorage(
+			storage.WithBackend(&backendStorage),
+			storage.WithBackendDB(backendStorageDB),
+		),
+		Config: *serverConf,
 	}
 
 	donech := make(chan struct{})
@@ -34,6 +42,7 @@ func main() {
 	router.Use(handlers.GzipMiddle)
 	router.Get("/", handlersStorage.GetAllHandler)
 	router.Get("/value/*", handlersStorage.GetMetricHandler)
+	router.Get("/ping", backendStorageDB.PingDb)
 	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
 
 	update := chi.NewRouter()
