@@ -11,14 +11,14 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/config"
 )
 
-type DbStorage struct {
+type DBStorage struct {
 	dbConnect *sql.DB
 	buffer    map[string]interface{}
 	config    config.Config
 }
 
-func NewDbStorage(backConf config.Config) (*DbStorage, error) {
-	db := DbStorage{}
+func NewDBStorage(backConf config.Config) (*DBStorage, error) {
+	db := DBStorage{}
 	db.config = backConf
 	if backConf.DatabaseDSN == "" {
 		return &db, nil
@@ -28,13 +28,13 @@ func NewDbStorage(backConf config.Config) (*DbStorage, error) {
 	return &db, err
 }
 
-func (ds *DbStorage) Close() {
+func (ds *DBStorage) Close() {
 	if ds.dbConnect != nil {
 		ds.dbConnect.Close()
 	}
 }
 
-func (ds *DbStorage) IsOK() bool {
+func (ds *DBStorage) IsOK() bool {
 	if ds.dbConnect == nil {
 		return false
 	}
@@ -46,7 +46,7 @@ func (ds *DbStorage) IsOK() bool {
 	return true
 }
 
-func (ds *DbStorage) PingDb(rw http.ResponseWriter, r *http.Request) {
+func (ds *DBStorage) PingDB(rw http.ResponseWriter, r *http.Request) {
 	if !ds.IsOK() {
 		http.Error(rw, "DB connect is NOT ok", http.StatusInternalServerError)
 		return

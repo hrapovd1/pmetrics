@@ -20,7 +20,7 @@ func main() {
 		logger.Fatalln(err)
 	}
 	backendStorage := storage.NewBackend(*serverConf)          // Файловый бекенд хранилища метрик
-	backendStorageDB, err := storage.NewDbStorage(*serverConf) // БД для метрик
+	backendStorageDB, err := storage.NewDBStorage(*serverConf) // БД для метрик
 	if err != nil {
 		logger.Fatalln(err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	router.Use(handlers.GzipMiddle)
 	router.Get("/", handlersStorage.GetAllHandler)
 	router.Get("/value/*", handlersStorage.GetMetricHandler)
-	router.Get("/ping", backendStorageDB.PingDb)
+	router.Get("/ping", backendStorageDB.PingDB)
 	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
 
 	update := chi.NewRouter()

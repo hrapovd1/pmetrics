@@ -22,6 +22,7 @@ func TestConfig_NewAgent(t *testing.T) {
 				StoreInterval:  0,
 				StoreFile:      "",
 				IsRestore:      false,
+				DatabaseDSN:    "",
 				Key:            "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
@@ -31,6 +32,7 @@ func TestConfig_NewAgent(t *testing.T) {
 					"RESTORE":         true,
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
 				},
 			},
 		},
@@ -58,6 +60,7 @@ func TestConfig_NewServer(t *testing.T) {
 				StoreFile:      "/tmp/devops-metrics-db.json",
 				IsRestore:      false,
 				Key:            "",
+				DatabaseDSN:    "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
 					"KEY":             true,
@@ -66,6 +69,7 @@ func TestConfig_NewServer(t *testing.T) {
 					"RESTORE":         true,
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
 				},
 			},
 		},

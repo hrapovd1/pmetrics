@@ -19,7 +19,7 @@ type Repository interface {
 type MemStorage struct {
 	buffer    map[string]interface{}
 	backend   *FileStorage
-	backendDB *DbStorage
+	backendDB *DBStorage
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -83,7 +83,7 @@ func WithBackend(backend *FileStorage) Option {
 	}
 }
 
-func WithBackendDB(backendDB *DbStorage) Option {
+func WithBackendDB(backendDB *DBStorage) Option {
 	return func(mem *MemStorage) *MemStorage {
 		mem.backendDB = backendDB
 		mem.backendDB.buffer = mem.buffer
