@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
@@ -68,20 +66,13 @@ func (ds *DBStorage) Restore() error {
 	if err != nil {
 		return err
 	}
-	metricTable, err := regexp.Compile("^" + types.DBtablePrefix)
-	if err != nil {
-		return err
-	}
 
 	for _, table := range tables {
-		if !metricTable.MatchString(table) {
-			continue
-		}
 		dbMetric := types.MetricModel{}
 		db.Table(table).Last(&dbMetric)
 
 		metric := types.Metric{}
-		metric.ID = strings.Split(table, types.DBtablePrefix)[1]
+		metric.ID = table
 		switch dbMetric.Mtype {
 		case "gauge":
 			ds.buffer[metric.ID] = dbMetric.Value.Float64
@@ -98,8 +89,8 @@ func (ds *DBStorage) Store() error {
 		return err
 	}
 	for k, v := range ds.buffer {
-		if !db.Migrator().HasTable(types.DBtablePrefix + k) {
-			if err := db.Table(types.DBtablePrefix + k).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+		if !db.Migrator().HasTable(k) {
+			if err := db.Table(k).Migrator().CreateTable(&types.MetricModel{}); err != nil {
 				return err
 			}
 		}
@@ -112,7 +103,7 @@ func (ds *DBStorage) Store() error {
 			metricVal.Mtype = "counter"
 			metricVal.Delta = sql.NullInt64{Int64: val, Valid: true}
 		}
-		db.Table(types.DBtablePrefix + k).Create(&metricVal)
+		db.Table(k).Create(&metricVal)
 	}
 	return nil
 }

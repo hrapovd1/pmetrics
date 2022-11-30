@@ -2,8 +2,6 @@ package types
 
 import "database/sql"
 
-const DBtablePrefix = "pmetric_"
-
 type Metric struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
