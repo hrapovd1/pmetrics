@@ -81,7 +81,7 @@ func (ds *DBStorage) Restore() error {
 		db.Table(table).Last(&dbMetric)
 
 		metric := types.Metric{}
-		metric.ID = strings.Split(table, types.DBtablePrefix)[1]
+		metric.ID = dbMetric.ID
 		switch dbMetric.Mtype {
 		case "gauge":
 			ds.buffer[metric.ID] = dbMetric.Value.Float64
@@ -98,8 +98,9 @@ func (ds *DBStorage) Store() error {
 		return err
 	}
 	for k, v := range ds.buffer {
-		if !db.Migrator().HasTable(types.DBtablePrefix + k) {
-			if err := db.Table(types.DBtablePrefix + k).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+		tableName := strings.ToLower(types.DBtablePrefix + k)
+		if !db.Migrator().HasTable(tableName) {
+			if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
 				return err
 			}
 		}
@@ -112,7 +113,7 @@ func (ds *DBStorage) Store() error {
 			metricVal.Mtype = "counter"
 			metricVal.Delta = sql.NullInt64{Int64: val, Valid: true}
 		}
-		db.Table(types.DBtablePrefix + k).Create(&metricVal)
+		db.Table(tableName).Create(&metricVal)
 	}
 	return nil
 }
