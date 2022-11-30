@@ -92,7 +92,7 @@ func (ds *DBStorage) Restore() error {
 	return nil
 }
 
-func (ds *DBStorage) Store() error {
+func (ds *DBStorage) Store(logger *log.Logger) error {
 	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
 	if err != nil {
 		return err
@@ -113,11 +113,11 @@ func (ds *DBStorage) Store() error {
 			metricVal.Mtype = "counter"
 			metricVal.Delta = sql.NullInt64{Int64: val, Valid: true}
 		}
-		log.Printf("Write to DB table: %v, value: %v\n", tableName, metricVal)
+		logger.Printf("Write to DB table: %v, value: %v\n", tableName, metricVal)
 		db.Table(tableName).Create(&metricVal)
 		res := types.MetricModel{}
 		db.Table(tableName).Last(&res)
-		log.Printf("Got last row from table: %v => %v\n", tableName, res)
+		logger.Printf("Got last row from table: %v => %v\n", tableName, res)
 	}
 	return nil
 }
@@ -148,7 +148,7 @@ func (ds *DBStorage) Storing(donech chan struct{}, logger *log.Logger) {
 		case <-donech:
 			return
 		case <-storeTick.C:
-			if err := ds.Store(); err != nil {
+			if err := ds.Store(logger); err != nil {
 				logger.Println(err)
 			}
 		}
