@@ -37,6 +37,8 @@ func main() {
 	donech := make(chan struct{})
 	defer close(donech)
 
+	logger.Printf("serverConf: %v\n", serverConf)
+
 	if serverConf.DatabaseDSN != "" {
 		go backendStorageDB.Storing(donech, logger)
 	} else {
