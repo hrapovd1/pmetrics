@@ -19,7 +19,8 @@ func main() {
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	backendStorage := storage.NewBackend(*serverConf)          // Файловый бекенд хранилища метрик
+	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
+	defer backendStorage.Close()
 	backendStorageDB, err := storage.NewDBStorage(*serverConf) // БД для метрик
 	if err != nil {
 		logger.Fatalln(err)
@@ -36,7 +37,11 @@ func main() {
 	donech := make(chan struct{})
 	defer close(donech)
 
-	go backendStorage.Storing(donech, logger)
+	if serverConf.DatabaseDSN != "" {
+		go backendStorageDB.Storing(donech, logger)
+	} else {
+		go backendStorage.Storing(donech, logger)
+	}
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)

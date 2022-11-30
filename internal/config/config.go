@@ -56,7 +56,7 @@ func GetServerFlags() Flags {
 	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
 	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
-	flag.StringVar(&flags.dbDSN, "d", "", "Database connect address, for example: postgres://username:password@localhost:5432/database_name")
+	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
 	flag.Parse()
 	return flags
 }
