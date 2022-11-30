@@ -113,7 +113,11 @@ func (ds *DBStorage) Store() error {
 			metricVal.Mtype = "counter"
 			metricVal.Delta = sql.NullInt64{Int64: val, Valid: true}
 		}
+		log.Printf("Write to DB table: %v, value: %v\n", tableName, metricVal)
 		db.Table(tableName).Create(&metricVal)
+		res := types.MetricModel{}
+		db.Table(tableName).Last(&res)
+		log.Printf("Got last row from table: %v => %v\n", tableName, res)
 	}
 	return nil
 }
