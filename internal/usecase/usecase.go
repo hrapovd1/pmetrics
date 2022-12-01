@@ -3,6 +3,7 @@ package usecase
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -59,6 +60,7 @@ func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
 }
 
 func WriteJSONMetric(ms *storage.MemStorage, data types.Metric) error {
+	log.Println("writeJSONmetric got: ", data)
 	switch data.MType {
 	case "gauge":
 		metricValue := storage.ToGauge(*data.Value)

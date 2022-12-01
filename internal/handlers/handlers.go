@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,7 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	log.Println("updateHandler got: ", body)
 	// check metric hash in data.
 	if ms.Config.Key != "" {
 		if !usecase.IsSignEqual(data, ms.Config.Key) {

@@ -36,7 +36,9 @@ func (ms *MemStorage) Append(key string, value counter) {
 	}
 	val := ms.buffer[key].(int64) + int64(value)
 	ms.buffer[key] = int64(val)
-	ms.logger.Println("Got ", key, val)
+	if ms.logger != nil {
+		ms.logger.Println("Got ", key, val)
+	}
 	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
@@ -44,7 +46,9 @@ func (ms *MemStorage) Append(key string, value counter) {
 			Delta: sql.NullInt64{Int64: int64(val), Valid: true},
 		}
 		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
-			ms.logger.Println(err)
+			if ms.logger != nil {
+				ms.logger.Println(err)
+			}
 		}
 	}
 }
@@ -68,7 +72,9 @@ func (ms *MemStorage) GetAll() map[string]interface{} {
 
 func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
-	ms.logger.Println("Got ", key, value)
+	if ms.logger != nil {
+		ms.logger.Println("Got ", key, value)
+	}
 	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
@@ -76,7 +82,9 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 			Value: sql.NullFloat64{Float64: float64(value), Valid: true},
 		}
 		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
-			ms.logger.Println(err)
+			if ms.logger != nil {
+				ms.logger.Println(err)
+			}
 		}
 	}
 }
