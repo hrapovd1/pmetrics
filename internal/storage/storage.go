@@ -36,7 +36,7 @@ func (ms *MemStorage) Append(key string, value counter) {
 	}
 	val := ms.buffer[key].(int64) + int64(value)
 	ms.buffer[key] = int64(val)
-	if ms.backendDB != nil {
+	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
 			Mtype: "counter",
@@ -67,7 +67,7 @@ func (ms *MemStorage) GetAll() map[string]interface{} {
 
 func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
-	if ms.backendDB != nil {
+	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
 			Mtype: "gauge",
