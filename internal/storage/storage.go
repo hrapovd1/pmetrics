@@ -36,6 +36,7 @@ func (ms *MemStorage) Append(key string, value counter) {
 	}
 	val := ms.buffer[key].(int64) + int64(value)
 	ms.buffer[key] = int64(val)
+	ms.logger.Println("Got ", key, val)
 	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,

@@ -37,11 +37,9 @@ func main() {
 
 	logger.Printf("serverConf: %v\n", serverConf)
 
-	if serverConf.DatabaseDSN == "" {
-		donech := make(chan struct{})
-		defer close(donech)
-		go backendStorage.Storing(donech, logger)
-	}
+	donech := make(chan struct{})
+	defer close(donech)
+	go backendStorage.Storing(donech, logger)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
