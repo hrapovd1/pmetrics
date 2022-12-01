@@ -29,14 +29,14 @@ type MemStorage struct {
 type Option func(mem *MemStorage) *MemStorage
 
 func (ms *MemStorage) Append(key string, value counter) {
+	var val int64
 	_, ok := ms.buffer[key]
-	if !ok {
-		ms.buffer[key] = int64(value)
-		return
+	if ok {
+		val = ms.buffer[key].(int64) + int64(value)
+	} else {
+		val = int64(value)
 	}
-	val := ms.buffer[key].(int64) + int64(value)
 	ms.buffer[key] = int64(val)
-	log.Println("got in append: ", key, " ", val)
 	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
@@ -70,7 +70,6 @@ func (ms *MemStorage) GetAll() map[string]interface{} {
 
 func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
-	log.Println("got in rewrite: ", key, " ", value)
 	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
 		metric := types.MetricModel{
 			ID:    key,
