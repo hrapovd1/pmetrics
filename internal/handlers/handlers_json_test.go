@@ -40,7 +40,7 @@ func TestMetricStorage_UpdateHandler(t *testing.T) {
 	}
 
 	ms := MetricStorage{
-		Storage: storage.NewMemStorage(),
+		Storage: storage.NewMemStorage(nil),
 	}
 
 	for _, test := range tests {
@@ -67,7 +67,7 @@ func TestMetricStorage_UpdateHandler(t *testing.T) {
 
 func TestMetricStorage_GetMetricJSONHandler(t *testing.T) {
 	stor := make(map[string]interface{})
-	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
 	stor["PollCount"] = int64(4)
 	stor["Sys"] = float64(0.0)
 	ms := MetricStorage{

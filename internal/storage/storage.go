@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"database/sql"
+	"log"
 	"strconv"
 
+	"github.com/hrapovd1/pmetrics/internal/types"
 	"golang.org/x/exp/maps"
 )
 
@@ -20,6 +23,7 @@ type MemStorage struct {
 	buffer    map[string]interface{}
 	backend   *FileStorage
 	backendDB *DBStorage
+	logger    *log.Logger
 }
 
 type Option func(mem *MemStorage) *MemStorage
@@ -32,6 +36,16 @@ func (ms *MemStorage) Append(key string, value counter) {
 	}
 	val := ms.buffer[key].(int64) + int64(value)
 	ms.buffer[key] = int64(val)
+	if ms.backendDB != nil {
+		metric := types.MetricModel{
+			ID:    key,
+			Mtype: "counter",
+			Delta: sql.NullInt64{Int64: int64(val), Valid: true},
+		}
+		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
+			ms.logger.Println(err)
+		}
+	}
 }
 
 func (ms *MemStorage) Get(key string) interface{} {
@@ -53,12 +67,23 @@ func (ms *MemStorage) GetAll() map[string]interface{} {
 
 func (ms *MemStorage) Rewrite(key string, value gauge) {
 	ms.buffer[key] = float64(value)
+	if ms.backendDB != nil {
+		metric := types.MetricModel{
+			ID:    key,
+			Mtype: "gauge",
+			Value: sql.NullFloat64{Float64: float64(value), Valid: true},
+		}
+		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
+			ms.logger.Println(err)
+		}
+	}
 }
 
-func NewMemStorage(opts ...Option) *MemStorage {
+func NewMemStorage(logger *log.Logger, opts ...Option) *MemStorage {
 	buffer := make(map[string]interface{})
 	ms := &MemStorage{
 		buffer: buffer,
+		logger: logger,
 	}
 
 	for _, opt := range opts {

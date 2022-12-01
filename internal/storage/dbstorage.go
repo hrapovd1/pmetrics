@@ -92,66 +92,21 @@ func (ds *DBStorage) Restore() error {
 	return nil
 }
 
-func (ds *DBStorage) Store(logger *log.Logger) error {
+func (ds *DBStorage) store(logger *log.Logger, metric *types.MetricModel) error {
 	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
 	if err != nil {
 		return err
 	}
-	for k, v := range ds.buffer {
-		tableName := strings.ToLower(types.DBtablePrefix + k)
-		if !db.Migrator().HasTable(tableName) {
-			if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
-				return err
-			}
+	tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
+	if !db.Migrator().HasTable(tableName) {
+		if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+			return err
 		}
-		metricVal := types.MetricModel{ID: k}
-		switch val := v.(type) {
-		case float64:
-			metricVal.Mtype = "gauge"
-			metricVal.Value = sql.NullFloat64{Float64: val, Valid: true}
-		case int64:
-			metricVal.Mtype = "counter"
-			metricVal.Delta = sql.NullInt64{Int64: val, Valid: true}
-		}
-		logger.Printf("Write to DB table: %v, value: %v\n", tableName, metricVal)
-		db.Table(tableName).Create(&metricVal)
-		res := types.MetricModel{}
-		db.Table(tableName).Last(&res)
-		logger.Printf("Got last row from table: %v => %v\n", tableName, res)
 	}
+	logger.Printf("Write to DB table: %v, value: %v\n", tableName, metric)
+	db.Table(tableName).Create(metric)
+	res := types.MetricModel{}
+	db.Table(tableName).Last(&res)
+	logger.Printf("Got last row from table: %v => %v\n", tableName, res)
 	return nil
-}
-
-func (ds *DBStorage) Storing(donech chan struct{}, logger *log.Logger) {
-	defer ds.Close()
-
-	if ds.config.DatabaseDSN == "" {
-		return
-	}
-
-	if ds.config.IsRestore {
-		if err := ds.Restore(); err != nil {
-			logger.Println(err)
-		}
-	}
-
-	var storeInterval time.Duration
-	if ds.config.StoreInterval > 0 {
-		storeInterval = ds.config.StoreInterval
-	} else {
-		storeInterval = ds.config.ReportInterval
-	}
-	storeTick := time.NewTicker(storeInterval)
-	defer storeTick.Stop()
-	for {
-		select {
-		case <-donech:
-			return
-		case <-storeTick.C:
-			if err := ds.Store(logger); err != nil {
-				logger.Println(err)
-			}
-		}
-	}
-
 }

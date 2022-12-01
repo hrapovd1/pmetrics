@@ -25,7 +25,7 @@ func TestMemStorage_Rewrite(t *testing.T) {
 	}
 
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(WithBuffer(stor))
+	ms := NewMemStorage(nil, WithBuffer(stor))
 	t.Run("Rewrite values.", func(t *testing.T) {
 		for _, tt := range tests {
 			ms.Rewrite(tt.key, gauge(tt.value))
@@ -56,7 +56,7 @@ func TestMemStorage_Append(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(WithBuffer(stor))
+	ms := NewMemStorage(nil, WithBuffer(stor))
 	for _, test := range tests {
 		t.Run("Append values", func(t *testing.T) {
 			ms.Append(test.key, counter(test.value))
@@ -70,7 +70,7 @@ func TestMemStorage_Append(t *testing.T) {
 
 func TestMemStorage_Get(t *testing.T) {
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(WithBuffer(stor))
+	ms := NewMemStorage(nil, WithBuffer(stor))
 	stor["PollCount"] = int64(1)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
@@ -131,7 +131,7 @@ func TestMemStorage_Get(t *testing.T) {
 
 func TestMemStorage_GetAll(t *testing.T) {
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(WithBuffer(stor))
+	ms := NewMemStorage(nil, WithBuffer(stor))
 	stor["PollCount"] = []int64{4}
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)

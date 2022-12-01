@@ -28,20 +28,18 @@ func main() {
 	defer backendStorageDB.Close()
 	handlersStorage := handlers.MetricStorage{ // Хранилище метрик
 		Storage: storage.NewMemStorage(
+			logger,
 			storage.WithBackend(&backendStorage),
 			storage.WithBackendDB(backendStorageDB),
 		),
 		Config: *serverConf,
 	}
 
-	donech := make(chan struct{})
-	defer close(donech)
-
 	logger.Printf("serverConf: %v\n", serverConf)
 
-	if serverConf.DatabaseDSN != "" {
-		go backendStorageDB.Storing(donech, logger)
-	} else {
+	if serverConf.DatabaseDSN == "" {
+		donech := make(chan struct{})
+		defer close(donech)
 		go backendStorage.Storing(donech, logger)
 	}
 
