@@ -72,7 +72,7 @@ func Test_metricsJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := metricsToJSON(tt.metrics, "")
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, string(tt.want), string(got))
 		})
 	}
 }
