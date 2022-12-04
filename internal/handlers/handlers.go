@@ -84,6 +84,46 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var data []types.Metric
+	if err := json.Unmarshal(body, &data); err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// check metric hash in data.
+	if ms.Config.Key != "" {
+		for _, item := range data {
+			if !usecase.IsSignEqual(item, ms.Config.Key) {
+				http.Error(rw, "sign metric is bad", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	// Write new metrics value
+	err = usecase.WriteJSONMetrics(ms.Storage.(*storage.MemStorage), &data)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	_, err = rw.Write([]byte(""))
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
 func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)

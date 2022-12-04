@@ -17,6 +17,7 @@ type Repository interface {
 	Get(key string) interface{}
 	GetAll() map[string]interface{}
 	Rewrite(key string, value gauge)
+	StoreAll(*[]types.Metric)
 }
 
 type MemStorage struct {
@@ -43,7 +44,7 @@ func (ms *MemStorage) Append(key string, value counter) {
 			Mtype: "counter",
 			Delta: sql.NullInt64{Int64: int64(val), Valid: true},
 		}
-		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
+		if err := ms.backendDB.store(&metric); err != nil {
 			if ms.logger != nil {
 				ms.logger.Println(err)
 			}
@@ -76,10 +77,31 @@ func (ms *MemStorage) Rewrite(key string, value gauge) {
 			Mtype: "gauge",
 			Value: sql.NullFloat64{Float64: float64(value), Valid: true},
 		}
-		if err := ms.backendDB.store(ms.logger, &metric); err != nil {
+		if err := ms.backendDB.store(&metric); err != nil {
 			if ms.logger != nil {
 				ms.logger.Println(err)
 			}
+		}
+	}
+}
+
+func (ms *MemStorage) StoreAll(metrics *[]types.Metric) {
+	metricsDB := make([]types.MetricModel, 0)
+	for _, m := range *metrics {
+		metricDB := types.MetricModel{ID: m.ID, Mtype: m.MType}
+		switch m.MType {
+		case "counter":
+			ms.buffer[m.ID] = *m.Delta
+			metricDB.Delta = sql.NullInt64{Int64: *m.Delta, Valid: true}
+		case "gauge":
+			ms.buffer[m.ID] = *m.Value
+			metricDB.Value = sql.NullFloat64{Float64: *m.Value, Valid: true}
+		}
+		metricsDB = append(metricsDB, metricDB)
+	}
+	if ms.backendDB != nil && ms.backendDB.dbConnect != nil {
+		if err := ms.backendDB.storeBatch(&metricsDB); err != nil {
+			ms.logger.Print(err)
 		}
 	}
 }

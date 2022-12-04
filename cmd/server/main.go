@@ -47,6 +47,7 @@ func main() {
 	router.Get("/value/*", handlersStorage.GetMetricHandler)
 	router.Get("/ping", backendStorageDB.PingDB)
 	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
+	router.Post("/updates/", handlersStorage.UpdatesHandler)
 
 	update := chi.NewRouter()
 	update.Post("/gauge/*", handlersStorage.GaugeHandler)

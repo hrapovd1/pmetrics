@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"math/rand"
 	"os"
@@ -28,8 +27,8 @@ func main() {
 	reportTick := time.NewTicker(agentConf.ReportInterval)
 	httpClient := resty.New()
 	PollCount := counter(0)
-	metrics := make(map[string]gauge, 28)
-	metricURL := "http://" + agentConf.ServerAddress + "/update/"
+	metrics := make(map[string]interface{}, 29)
+	metricURL := "http://" + agentConf.ServerAddress + "/updates/"
 
 	logger.Println("started")
 	defer logger.Println("stopped")
@@ -37,37 +36,25 @@ func main() {
 		select {
 		case <-pollTick.C:
 			PollCount++
+			metrics["PollCount"] = PollCount
 			pollMetrics(metrics)
 		case <-reportTick.C:
-			for k, v := range metrics {
-				data, err := metricToJSON(k, v, agentConf.Key)
-				if err != nil {
-					logger.Fatalln(err)
-				}
-				_, err = httpClient.R().
-					SetHeader("Content-Type", "application/json").
-					SetBody(data).
-					Post(metricURL)
-				if err != nil {
-					logger.Print("Error when sent metric. ", err)
-				}
-			}
-			data, err := metricToJSON("PollCount", PollCount, agentConf.Key)
+			data, err := metricsToJSON(metrics, agentConf.Key)
 			if err != nil {
-				logger.Fatalln(err)
+				logger.Println(err)
 			}
 			_, err = httpClient.R().
 				SetHeader("Content-Type", "application/json").
 				SetBody(data).
 				Post(metricURL)
 			if err != nil {
-				logger.Print("Error when sent metric. ", err)
+				logger.Print("Error when sent metrics. ", err)
 			}
 		}
 	}
 }
 
-func pollMetrics(metrics map[string]gauge) {
+func pollMetrics(metrics map[string]interface{}) {
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
 	metrics["Alloc"] = gauge(rtm.Alloc)
@@ -100,36 +87,34 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["RandomValue"] = gauge(rand.Float64())
 }
 
-func metricToJSON(name string, val interface{}, key string) ([]byte, error) {
-	var value float64
-	var delta int64
-	switch val := val.(type) {
-	case gauge:
-		value = float64(val)
-		data := types.Metric{
-			ID:    name,
-			MType: "gauge",
-			Value: &value,
-		}
-		if key != "" {
-			if err := usecase.SignData(&data, key); err != nil {
-				return nil, err
+func metricsToJSON(mtrcs map[string]interface{}, key string) ([]byte, error) {
+	metrics := make([]types.Metric, 0)
+	for k, v := range mtrcs {
+		var value float64
+		var delta int64
+		data := types.Metric{ID: k}
+		switch val := v.(type) {
+		case gauge:
+			value = float64(val)
+			data.MType = "gauge"
+			data.Value = &value
+			if key != "" {
+				if err := usecase.SignData(&data, key); err != nil {
+					return nil, err
+				}
 			}
-		}
-		return json.Marshal(data)
-	case counter:
-		delta = int64(val)
-		data := types.Metric{
-			ID:    name,
-			MType: "counter",
-			Delta: &delta,
-		}
-		if key != "" {
-			if err := usecase.SignData(&data, key); err != nil {
-				return nil, err
+			metrics = append(metrics, data)
+		case counter:
+			delta = int64(val)
+			data.MType = "counter"
+			data.Delta = &delta
+			if key != "" {
+				if err := usecase.SignData(&data, key); err != nil {
+					return nil, err
+				}
 			}
+			metrics = append(metrics, data)
 		}
-		return json.Marshal(data)
 	}
-	return nil, errors.New("got undefined metric type")
+	return json.Marshal(metrics)
 }

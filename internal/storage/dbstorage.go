@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -92,7 +91,7 @@ func (ds *DBStorage) Restore() error {
 	return nil
 }
 
-func (ds *DBStorage) store(logger *log.Logger, metric *types.MetricModel) error {
+func (ds *DBStorage) store(metric *types.MetricModel) error {
 	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
 	if err != nil {
 		return err
@@ -103,10 +102,30 @@ func (ds *DBStorage) store(logger *log.Logger, metric *types.MetricModel) error 
 			return err
 		}
 	}
-	logger.Printf("Write to DB table: %v, value: %v\n", tableName, metric)
 	db.Table(tableName).Create(metric)
-	res := types.MetricModel{}
-	db.Table(tableName).Last(&res)
-	logger.Printf("Got last row from table: %v => %v\n", tableName, res)
+	return nil
+}
+
+func (ds *DBStorage) storeBatch(metrics *[]types.MetricModel) error {
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		for _, metric := range *metrics {
+			tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
+			if !tx.Migrator().HasTable(tableName) {
+				if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+					return err
+				}
+			}
+			tx.Table(tableName).Create(&metric)
+		}
+		return nil
+
+	}); err != nil {
+		return err
+	}
 	return nil
 }

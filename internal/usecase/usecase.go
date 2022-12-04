@@ -73,6 +73,11 @@ func WriteJSONMetric(ms *storage.MemStorage, data types.Metric) error {
 	}
 }
 
+func WriteJSONMetrics(ms *storage.MemStorage, data *[]types.Metric) error {
+	ms.StoreAll(data)
+	return nil
+}
+
 func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
 	var err error
 
