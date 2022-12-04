@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,18 +62,23 @@ func Test_metricsJSON(t *testing.T) {
 		name    string
 		metrics map[string]interface{}
 		want    []byte
+		wantn   []byte
 	}{
 		{
 			name:    "Check gauge",
 			metrics: map[string]interface{}{"M1": counter(345), "M2": gauge(63.689)},
 			want:    []byte(`[{"id":"M1","type":"counter","delta":345},{"id":"M2","type":"gauge","value":63.689}]`),
+			wantn:   []byte(`[{"id":"M2","type":"gauge","value":63.689},{"id":"M1","type":"counter","delta":345}]`),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := metricsToJSON(tt.metrics, "")
 			require.NoError(t, err)
-			assert.Equal(t, string(tt.want), string(got))
+			assert.True(
+				t,
+				reflect.DeepEqual(tt.want, got) || reflect.DeepEqual(tt.wantn, got),
+			)
 		})
 	}
 }
