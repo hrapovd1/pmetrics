@@ -91,8 +91,15 @@ func (ms *MemStorage) StoreAll(metrics *[]types.Metric) {
 		metricDB := types.MetricModel{ID: m.ID, Mtype: m.MType}
 		switch m.MType {
 		case "counter":
-			ms.buffer[m.ID] = *m.Delta
-			metricDB.Delta = sql.NullInt64{Int64: *m.Delta, Valid: true}
+			var val int64
+			_, ok := ms.buffer[m.ID]
+			if ok {
+				val = ms.buffer[m.ID].(int64) + *m.Delta
+			} else {
+				val = *m.Delta
+			}
+			ms.buffer[m.ID] = val
+			metricDB.Delta = sql.NullInt64{Int64: val, Valid: true}
 		case "gauge":
 			ms.buffer[m.ID] = *m.Value
 			metricDB.Value = sql.NullFloat64{Float64: *m.Value, Valid: true}
