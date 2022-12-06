@@ -35,8 +35,6 @@ func main() {
 		Config: *serverConf,
 	}
 
-	logger.Printf("serverConf: %v\n", serverConf)
-
 	donech := make(chan struct{})
 	defer close(donech)
 	go backendStorage.Storing(donech, logger)
