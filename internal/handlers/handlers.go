@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
-	"github.com/hrapovd1/pmetrics/internal/storage"
+	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
 	"github.com/hrapovd1/pmetrics/templates/core"
@@ -21,8 +21,10 @@ const (
 )
 
 type MetricStorage struct {
-	Storage storage.Repository
-	Config  config.Config
+	MemStor  types.Repository
+	FileStor types.Repository
+	DBStor   types.Repository
+	Config   config.Config
 }
 
 func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
@@ -48,14 +50,18 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	// Write new metrics value
-	err = usecase.WriteJSONMetric(ms.Storage.(*storage.MemStorage), data)
+	err = usecase.WriteJSONMetric(
+		data,
+		ms.MemStor,
+		ms.DBStor,
+	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Get metric value for response
-	err = usecase.GetJSONMetric(ms.Storage.(*storage.MemStorage), &data)
+	err = usecase.GetJSONMetric(ms.MemStor, &data)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -109,7 +115,11 @@ func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	// Write new metrics value
-	err = usecase.WriteJSONMetrics(ms.Storage.(*storage.MemStorage), &data)
+	err = usecase.WriteJSONMetrics(
+		&data,
+		ms.MemStor,
+		ms.DBStor,
+	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -139,7 +149,7 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 	}
 
 	// Get metric value for response
-	if err = usecase.GetJSONMetric(ms.Storage.(*storage.MemStorage), &data); err != nil {
+	if err = usecase.GetJSONMetric(ms.MemStor, &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -186,7 +196,11 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = usecase.WriteMetric(ms.Storage.(*storage.MemStorage), splitedPath)
+	err = usecase.WriteMetric(
+		splitedPath,
+		ms.MemStor,
+		ms.DBStor,
+	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -218,7 +232,11 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = usecase.WriteMetric(ms.Storage.(*storage.MemStorage), splitedPath)
+	err = usecase.WriteMetric(
+		splitedPath,
+		ms.MemStor,
+		ms.DBStor,
+	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -245,7 +263,7 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	metricVal, err := usecase.GetMetric(ms.Storage.(*storage.MemStorage), splitedPath)
+	metricVal, err := usecase.GetMetric(ms.MemStor, splitedPath)
 	if err != nil {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)
 		return
@@ -270,7 +288,7 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	outTable := usecase.GetTableMetrics(ms.Storage.(*storage.MemStorage))
+	outTable := usecase.GetTableMetrics(ms.MemStor)
 
 	indexTmplt, err := template.ParseFS(core.Index, "index.html")
 	if err != nil {
@@ -285,6 +303,16 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (ms *MetricStorage) PingDB(rw http.ResponseWriter, r *http.Request) {
+	dbstor := ms.DBStor.(*dbstorage.DBStorage)
+	if !dbstor.Ping() {
+		http.Error(rw, "DB connect is NOT ok", http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "text/html")
+	rw.WriteHeader(http.StatusOK)
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {

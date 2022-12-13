@@ -12,6 +12,14 @@ type Metric struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
+type Repository interface {
+	Append(key string, value int64)
+	Get(key string) interface{}
+	GetAll() map[string]interface{}
+	Rewrite(key string, value float64)
+	StoreAll(*[]Metric)
+}
+
 type MetricModel struct {
 	Timestamp int64 `gorm:"primaryKey;autoCreateTime"`
 	ID        string

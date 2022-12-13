@@ -1,4 +1,4 @@
-package storage
+package filestorage
 
 import (
 	"bufio"
@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewBackend(t *testing.T) {
+func TestNewFileStorage(t *testing.T) {
 	backConf := config.Config{ServerAddress: "", StoreFile: "", StoreInterval: 0, IsRestore: false}
 	test := struct {
 		backConf config.Config
-		want     FileStorage
+		want     *FileStorage
 	}{
 		backConf: backConf,
-		want:     FileStorage{config: backConf, file: nil, writer: nil, buff: nil},
+		want:     &FileStorage{config: backConf, file: nil, writer: nil, buff: nil},
 	}
-	assert.Equal(t, test.want, NewBackend(test.backConf))
+	assert.Equal(t, test.want, NewFileStorage(test.backConf, map[string]interface{}{}))
 }
 
 func TestFileStorage_Close(t *testing.T) {
@@ -37,7 +37,7 @@ func TestFileStorage_Close(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fileStorage := NewBackend(test.cfg)
+			fileStorage := NewFileStorage(test.cfg, map[string]interface{}{})
 			if test.want {
 				assert.Nil(t, fileStorage.Close())
 			} else {

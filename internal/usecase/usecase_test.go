@@ -31,10 +31,10 @@ func TestWriteJSONMetric(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
-	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WriteJSONMetric(locStorage, tt.data)
+			err := WriteJSONMetric(tt.data, locStorage)
 			require.NoError(t, err)
 			switch result := locStorage.Get(tt.data.ID).(type) {
 			case int64:
@@ -75,7 +75,7 @@ func TestGetJSONMetric(t *testing.T) {
 	stor := make(map[string]interface{})
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(-4.65)
-	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,10 +123,10 @@ func TestWriteMetric(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
-	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WriteMetric(locStorage, tt.path)
+			err := WriteMetric(tt.path, locStorage)
 			require.NoError(t, err)
 			switch result := locStorage.Get(tt.metricName).(type) {
 			case int64:
@@ -178,7 +178,7 @@ func TestGetMetric(t *testing.T) {
 	stor := make(map[string]interface{})
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(0)
-	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestGetTableMetrics(t *testing.T) {
 	stor := make(map[string]interface{})
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(0)
-	locStorage := storage.NewMemStorage(nil, storage.WithBuffer(stor))
+	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	result := GetTableMetrics(locStorage)
 
 	t.Run(test.name, func(t *testing.T) {

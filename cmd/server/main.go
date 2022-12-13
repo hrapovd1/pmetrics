@@ -8,6 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
+	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
+	"github.com/hrapovd1/pmetrics/internal/filestorage"
 	"github.com/hrapovd1/pmetrics/internal/handlers"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 )
@@ -19,31 +21,36 @@ func main() {
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
-	defer backendStorage.Close()
-	backendStorageDB, err := storage.NewDBStorage(*serverConf) // БД для метрик
+
+	memBuff := make(map[string]interface{})
+
+	fileStorage := filestorage.NewFileStorage(*serverConf, memBuff) // Файловый бекенд хранилища метрик
+	defer fileStorage.Close()
+
+	dbStorage, err := dbstorage.NewDBStorage(*serverConf, logger, memBuff) // БД для метрик
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	defer backendStorageDB.Close()
+	defer dbStorage.Close()
+
 	handlersStorage := handlers.MetricStorage{ // Хранилище метрик
-		Storage: storage.NewMemStorage(
-			logger,
-			storage.WithBackend(&backendStorage),
-			storage.WithBackendDB(backendStorageDB),
+		MemStor: storage.NewMemStorage(
+			storage.WithBuffer(memBuff),
 		),
-		Config: *serverConf,
+		FileStor: fileStorage,
+		DBStor:   dbStorage,
+		Config:   *serverConf,
 	}
 
 	donech := make(chan struct{})
 	defer close(donech)
-	go backendStorage.Storing(donech, logger)
+	go fileStorage.Storing(donech, logger)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
 	router.Get("/", handlersStorage.GetAllHandler)
 	router.Get("/value/*", handlersStorage.GetMetricHandler)
-	router.Get("/ping", backendStorageDB.PingDB)
+	router.Get("/ping", handlersStorage.PingDB)
 	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
 	router.Post("/updates/", handlersStorage.UpdatesHandler)
 

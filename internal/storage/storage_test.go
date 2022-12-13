@@ -25,10 +25,10 @@ func TestMemStorage_Rewrite(t *testing.T) {
 	}
 
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(nil, WithBuffer(stor))
+	ms := NewMemStorage(WithBuffer(stor))
 	t.Run("Rewrite values.", func(t *testing.T) {
 		for _, tt := range tests {
-			ms.Rewrite(tt.key, gauge(tt.value))
+			ms.Rewrite(tt.key, tt.value)
 			assert.Equal(t, tt.value, stor[tt.key])
 		}
 	})
@@ -56,10 +56,10 @@ func TestMemStorage_Append(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(nil, WithBuffer(stor))
+	ms := NewMemStorage(WithBuffer(stor))
 	for _, test := range tests {
 		t.Run("Append values", func(t *testing.T) {
-			ms.Append(test.key, counter(test.value))
+			ms.Append(test.key, test.value)
 			assert.Equal(t, test.value, stor[test.key].(int64))
 		})
 	}
@@ -70,7 +70,7 @@ func TestMemStorage_Append(t *testing.T) {
 
 func TestMemStorage_Get(t *testing.T) {
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(nil, WithBuffer(stor))
+	ms := NewMemStorage(WithBuffer(stor))
 	stor["PollCount"] = int64(1)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
@@ -131,7 +131,7 @@ func TestMemStorage_Get(t *testing.T) {
 
 func TestMemStorage_GetAll(t *testing.T) {
 	stor := make(map[string]interface{})
-	ms := NewMemStorage(nil, WithBuffer(stor))
+	ms := NewMemStorage(WithBuffer(stor))
 	stor["PollCount"] = []int64{4}
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
@@ -139,44 +139,4 @@ func TestMemStorage_GetAll(t *testing.T) {
 		out := ms.GetAll()
 		assert.True(t, cmp.Equal(stor, out))
 	})
-}
-
-func TestToGauge(t *testing.T) {
-	tests := []struct {
-		name  string
-		value float64
-		want  gauge
-	}{
-		{
-			name:  "Float value",
-			value: float64(1.0),
-			want:  gauge(1.0),
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			value := ToGauge(test.value)
-			assert.Equal(t, test.want, value)
-		})
-	}
-}
-
-func TestToCounter(t *testing.T) {
-	tests := []struct {
-		name  string
-		value int64
-		want  counter
-	}{
-		{
-			name:  "Int value",
-			value: int64(-0),
-			want:  counter(0),
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			value := ToCounter(test.value)
-			assert.Equal(t, test.want, value)
-		})
-	}
 }

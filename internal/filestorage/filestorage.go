@@ -1,4 +1,4 @@
-package storage
+package filestorage
 
 import (
 	"bufio"
@@ -18,25 +18,45 @@ type FileStorage struct {
 	buff   map[string]interface{}
 }
 
-func NewBackend(backConf config.Config) FileStorage {
-	fs := FileStorage{}
+func (fs *FileStorage) Append(key string, value int64) {
+}
+
+func (fs *FileStorage) Get(key string) interface{} {
+	return nil
+}
+
+func (fs *FileStorage) GetAll() map[string]interface{} {
+	return nil
+}
+
+func (fs *FileStorage) Rewrite(key string, value float64) {
+}
+
+func (fs *FileStorage) StoreAll(metric *[]types.Metric) {
+}
+
+func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
+	fs := &FileStorage{}
 	var err error
-	fs.config = backConf
-	if backConf.StoreFile == "" {
+	fs.config = conf
+	if conf.StoreFile == "" {
 		fs.file = nil
 		fs.writer = nil
 		fs.config.IsRestore = false
 		return fs
 	}
+	fs.buff = buff
 	fileOptions := os.O_RDWR | os.O_CREATE | os.O_APPEND
-	if backConf.StoreInterval == 0 {
+	if conf.StoreInterval == 0 {
 		fileOptions = fileOptions | os.O_SYNC
 	}
-	fs.file, err = os.OpenFile(backConf.StoreFile, fileOptions, 0777)
+
+	fs.file, err = os.OpenFile(conf.StoreFile, fileOptions, 0777)
 	if err != nil {
 		panic(err)
 	}
 	fs.writer = bufio.NewWriter(fs.file)
+
 	return fs
 }
 

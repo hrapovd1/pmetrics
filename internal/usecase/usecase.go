@@ -16,19 +16,27 @@ const (
 	getMetricName = 3
 )
 
-func WriteMetric(ms *storage.MemStorage, path []string) error {
+func WriteMetric(path []string, repos ...types.Repository) error {
 	metricKey := path[metricName]
 	switch path[metricType] {
 	case "gauge":
-		metricValue, err := storage.StrToGauge(path[metricVal])
+		metricValue, err := storage.StrToFloat64(path[metricVal])
 		if err == nil {
-			ms.Rewrite(metricKey, metricValue)
+			for _, repo := range repos {
+				if repo != nil {
+					repo.Rewrite(metricKey, metricValue)
+				}
+			}
 		}
 		return err
 	case "counter":
-		metricValue, err := storage.StrToCounter(path[metricVal])
+		metricValue, err := storage.StrToInt64(path[metricVal])
 		if err == nil {
-			ms.Append(metricKey, metricValue)
+			for _, repo := range repos {
+				if repo != nil {
+					repo.Append(metricKey, metricValue)
+				}
+			}
 		}
 		return err
 	default:
@@ -36,14 +44,14 @@ func WriteMetric(ms *storage.MemStorage, path []string) error {
 	}
 }
 
-func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
+func GetMetric(repo types.Repository, path []string) (string, error) {
 	metricType := path[getMetricType]
 	metric := path[getMetricName]
 	var metricValue string
 	var err error
 
 	if metricType == "gauge" || metricType == "counter" {
-		metricVal := ms.Get(metric)
+		metricVal := repo.Get(metric)
 		switch metricVal := metricVal.(type) {
 		case int64:
 			metricValue = fmt.Sprint(metricVal)
@@ -58,32 +66,44 @@ func GetMetric(ms *storage.MemStorage, path []string) (string, error) {
 	return metricValue, err
 }
 
-func WriteJSONMetric(ms *storage.MemStorage, data types.Metric) error {
+func WriteJSONMetric(data types.Metric, repos ...types.Repository) error {
 	switch data.MType {
 	case "gauge":
-		metricValue := storage.ToGauge(*data.Value)
-		ms.Rewrite(data.ID, metricValue)
+		metricValue := *data.Value
+		for _, repo := range repos {
+			if repo != nil {
+				repo.Rewrite(data.ID, metricValue)
+			}
+		}
 		return nil
 	case "counter":
-		metricValue := storage.ToCounter(*data.Delta)
-		ms.Append(data.ID, metricValue)
+		metricValue := *data.Delta
+		for _, repo := range repos {
+			if repo != nil {
+				repo.Append(data.ID, metricValue)
+			}
+		}
 		return nil
 	default:
 		return errors.New("undefined metric type")
 	}
 }
 
-func WriteJSONMetrics(ms *storage.MemStorage, data *[]types.Metric) error {
-	ms.StoreAll(data)
+func WriteJSONMetrics(data *[]types.Metric, repos ...types.Repository) error {
+	for _, repo := range repos {
+		if repo != nil {
+			repo.StoreAll(data)
+		}
+	}
 	return nil
 }
 
-func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
+func GetJSONMetric(repo types.Repository, data *types.Metric) error {
 	var err error
 
 	switch data.MType {
 	case "gauge":
-		val := ms.Get(data.ID)
+		val := repo.Get(data.ID)
 		if val == nil {
 			return errors.New("not found")
 		}
@@ -91,7 +111,7 @@ func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
 		data.Value = &value
 		err = nil
 	case "counter":
-		val := ms.Get(data.ID)
+		val := repo.Get(data.ID)
 		if val == nil {
 			return errors.New("not found")
 		}
@@ -104,10 +124,10 @@ func GetJSONMetric(ms *storage.MemStorage, data *types.Metric) error {
 	return err
 }
 
-func GetTableMetrics(ms *storage.MemStorage) map[string]string {
+func GetTableMetrics(repo types.Repository) map[string]string {
 	outTable := make(map[string]string)
 
-	for k, v := range ms.GetAll() {
+	for k, v := range repo.GetAll() {
 		switch value := v.(type) {
 		case int64:
 			outTable[k] = fmt.Sprint(value)

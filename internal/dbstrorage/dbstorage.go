@@ -1,0 +1,167 @@
+package dbstorage
+
+import (
+	"context"
+	"database/sql"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/hrapovd1/pmetrics/internal/config"
+	"github.com/hrapovd1/pmetrics/internal/types"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+type DBStorage struct {
+	dbConnect *sql.DB
+	buff      map[string]interface{}
+	config    config.Config
+	logger    *log.Logger
+}
+
+type Pinger interface {
+	Ping() bool
+}
+
+func (ds *DBStorage) Append(key string, value int64) {
+	if ds.dbConnect == nil {
+		return
+	}
+	var val int64
+	_, ok := ds.buff[key]
+	if ok {
+		val = ds.buff[key].(int64) + value
+	} else {
+		val = value
+	}
+	metric := types.MetricModel{
+		ID:    key,
+		Mtype: "counter",
+		Delta: sql.NullInt64{Int64: val, Valid: true},
+	}
+	if err := ds.store(&metric); err != nil {
+		if ds.logger != nil {
+			ds.logger.Println(err)
+		}
+	}
+}
+
+func (ds *DBStorage) Get(key string) interface{} {
+	return nil
+}
+
+func (ds *DBStorage) GetAll() map[string]interface{} {
+	return nil
+}
+
+func (ds *DBStorage) Rewrite(key string, value float64) {
+	if ds.dbConnect != nil {
+		metric := types.MetricModel{
+			ID:    key,
+			Mtype: "gauge",
+			Value: sql.NullFloat64{Float64: value, Valid: true},
+		}
+		if err := ds.store(&metric); err != nil {
+			if ds.logger != nil {
+				ds.logger.Println(err)
+			}
+		}
+	}
+}
+
+func (ds *DBStorage) StoreAll(metrics *[]types.Metric) {
+	metricsDB := make([]types.MetricModel, 0)
+	for _, m := range *metrics {
+		metricDB := types.MetricModel{ID: m.ID, Mtype: m.MType}
+		switch m.MType {
+		case "counter":
+			var val int64
+			_, ok := ds.buff[m.ID]
+			if ok {
+				val = ds.buff[m.ID].(int64) + *m.Delta
+			} else {
+				val = *m.Delta
+			}
+			metricDB.Delta = sql.NullInt64{Int64: val, Valid: true}
+		case "gauge":
+			metricDB.Value = sql.NullFloat64{Float64: *m.Value, Valid: true}
+		}
+		metricsDB = append(metricsDB, metricDB)
+	}
+	if ds.dbConnect != nil {
+		if err := ds.storeBatch(&metricsDB); err != nil {
+			ds.logger.Print(err)
+		}
+	}
+}
+
+func NewDBStorage(conf config.Config, logger *log.Logger, buff map[string]interface{}) (*DBStorage, error) {
+	db := DBStorage{}
+	db.config = conf
+	if conf.DatabaseDSN == "" {
+		return &db, nil
+	}
+	db.logger = logger
+	db.buff = buff
+	dbConnect, err := sql.Open("pgx", db.config.DatabaseDSN)
+	db.dbConnect = dbConnect
+	return &db, err
+}
+
+func (ds *DBStorage) Close() {
+	if ds.dbConnect != nil {
+		ds.dbConnect.Close()
+	}
+}
+
+func (ds *DBStorage) store(metric *types.MetricModel) error {
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+	tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
+	if !db.Migrator().HasTable(tableName) {
+		if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+			return err
+		}
+	}
+	db.Table(tableName).Create(metric)
+	return nil
+}
+
+func (ds *DBStorage) Ping() bool {
+	if ds.dbConnect == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := ds.dbConnect.PingContext(ctx); err != nil {
+		return false
+	}
+	return true
+}
+
+func (ds *DBStorage) storeBatch(metrics *[]types.MetricModel) error {
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		for _, metric := range *metrics {
+			tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
+			if !tx.Migrator().HasTable(tableName) {
+				if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+					return err
+				}
+			}
+			tx.Table(tableName).Create(&metric)
+		}
+		return nil
+
+	}); err != nil {
+		return err
+	}
+	return nil
+}
