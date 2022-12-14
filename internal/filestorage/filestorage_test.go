@@ -2,6 +2,7 @@ package filestorage
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"testing"
 
@@ -17,9 +18,9 @@ func TestNewFileStorage(t *testing.T) {
 		want     *FileStorage
 	}{
 		backConf: backConf,
-		want:     &FileStorage{config: backConf, file: nil, writer: nil, buff: nil},
+		want:     &FileStorage{ctx: context.Background(), config: backConf, file: nil, writer: nil, buff: nil},
 	}
-	assert.Equal(t, test.want, NewFileStorage(test.backConf, map[string]interface{}{}))
+	assert.Equal(t, test.want, NewFileStorage(context.Background(), test.backConf, map[string]interface{}{}))
 }
 
 func TestFileStorage_Close(t *testing.T) {
@@ -37,7 +38,7 @@ func TestFileStorage_Close(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fileStorage := NewFileStorage(test.cfg, map[string]interface{}{})
+			fileStorage := NewFileStorage(context.Background(), test.cfg, map[string]interface{}{})
 			if test.want {
 				assert.Nil(t, fileStorage.Close())
 			} else {
@@ -56,6 +57,7 @@ func TestFileStorage_Restore(t *testing.T) {
 		"M2": float64(3.9),
 	}
 	fs := FileStorage{
+		ctx:    context.Background(),
 		file:   tmpFile,
 		writer: bufio.NewWriter(tmpFile),
 		buff:   result,

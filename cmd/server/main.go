@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -22,12 +23,15 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	memBuff := make(map[string]interface{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	fileStorage := filestorage.NewFileStorage(*serverConf, memBuff) // Файловый бекенд хранилища метрик
+	memBuff := make(map[string]interface{}) // Основной буфер хранения метрик
+
+	fileStorage := filestorage.NewFileStorage(ctx, *serverConf, memBuff) // Файловый бекенд хранилища метрик
 	defer fileStorage.Close()
 
-	dbStorage, err := dbstorage.NewDBStorage(*serverConf, logger, memBuff) // БД для метрик
+	dbStorage, err := dbstorage.NewDBStorage(ctx, *serverConf, logger, memBuff) // БД для метрик
 	if err != nil {
 		logger.Fatalln(err)
 	}
@@ -42,9 +46,7 @@ func main() {
 		Config:   *serverConf,
 	}
 
-	donech := make(chan struct{})
-	defer close(donech)
-	go fileStorage.Storing(donech, logger)
+	go fileStorage.Storing(logger)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)

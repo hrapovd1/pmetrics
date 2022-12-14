@@ -2,6 +2,7 @@ package filestorage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 type FileStorage struct {
 	file   *os.File
 	writer *bufio.Writer
+	ctx    context.Context
 	config config.Config
 	buff   map[string]interface{}
 }
@@ -35,8 +37,9 @@ func (fs *FileStorage) Rewrite(key string, value float64) {
 func (fs *FileStorage) StoreAll(metric *[]types.Metric) {
 }
 
-func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
+func NewFileStorage(ctx context.Context, conf config.Config, buff map[string]interface{}) *FileStorage {
 	fs := &FileStorage{}
+	fs.ctx = ctx
 	var err error
 	fs.config = conf
 	if conf.StoreFile == "" {
@@ -69,53 +72,62 @@ func (fs *FileStorage) Close() error {
 
 func (fs *FileStorage) Restore() error {
 	var err error
-	scan := bufio.NewScanner(fs.file)
 	var data []byte
-	for scan.Scan() {
-		data = scan.Bytes()
-	}
 	metrics := make([]types.Metric, 0)
-	err = json.Unmarshal(data, &metrics)
-	for _, metric := range metrics {
-		switch metric.MType {
-		case "gauge":
-			fs.buff[metric.ID] = *metric.Value
-		case "counter":
-			fs.buff[metric.ID] = *metric.Delta
+	scan := bufio.NewScanner(fs.file)
+	select {
+	case <-fs.ctx.Done():
+		return nil
+	default:
+		for scan.Scan() {
+			data = scan.Bytes()
 		}
+		err = json.Unmarshal(data, &metrics)
+		for _, metric := range metrics {
+			switch metric.MType {
+			case "gauge":
+				fs.buff[metric.ID] = *metric.Value
+			case "counter":
+				fs.buff[metric.ID] = *metric.Delta
+			}
+		}
+		return err
 	}
-
-	return err
 }
 
 func (fs *FileStorage) Store() error {
 	metrics := make([]types.Metric, 0)
-	for k, v := range fs.buff {
-		metric := types.Metric{ID: k}
-		switch val := v.(type) {
-		case int64:
-			metric.MType = "counter"
-			metric.Delta = &val
-		case float64:
-			metric.MType = "gauge"
-			metric.Value = &val
+	select {
+	case <-fs.ctx.Done():
+		return nil
+	default:
+		for k, v := range fs.buff {
+			metric := types.Metric{ID: k}
+			switch val := v.(type) {
+			case int64:
+				metric.MType = "counter"
+				metric.Delta = &val
+			case float64:
+				metric.MType = "gauge"
+				metric.Value = &val
+			}
+			metrics = append(metrics, metric)
 		}
-		metrics = append(metrics, metric)
+		data, err := json.Marshal(metrics)
+		if err != nil {
+			return err
+		}
+		if _, err := fs.writer.Write(data); err != nil {
+			return err
+		}
+		if err := fs.writer.WriteByte('\n'); err != nil {
+			return err
+		}
+		return fs.writer.Flush()
 	}
-	data, err := json.Marshal(metrics)
-	if err != nil {
-		return err
-	}
-	if _, err := fs.writer.Write(data); err != nil {
-		return err
-	}
-	if err := fs.writer.WriteByte('\n'); err != nil {
-		return err
-	}
-	return fs.writer.Flush()
 }
 
-func (fs *FileStorage) Storing(donech chan struct{}, logger *log.Logger) {
+func (fs *FileStorage) Storing(logger *log.Logger) {
 	defer fs.Close()
 	if fs.config.StoreFile == "" {
 		return
@@ -135,7 +147,7 @@ func (fs *FileStorage) Storing(donech chan struct{}, logger *log.Logger) {
 	defer storeTick.Stop()
 	for {
 		select {
-		case <-donech:
+		case <-fs.ctx.Done():
 			return
 		case <-storeTick.C:
 			if err := fs.Store(); err != nil {

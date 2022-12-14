@@ -16,6 +16,7 @@ import (
 type DBStorage struct {
 	dbConnect *sql.DB
 	buff      map[string]interface{}
+	ctx       context.Context
 	config    config.Config
 	logger    *log.Logger
 }
@@ -96,14 +97,15 @@ func (ds *DBStorage) StoreAll(metrics *[]types.Metric) {
 	}
 }
 
-func NewDBStorage(conf config.Config, logger *log.Logger, buff map[string]interface{}) (*DBStorage, error) {
+func NewDBStorage(ctx context.Context, conf config.Config, logger *log.Logger, buff map[string]interface{}) (*DBStorage, error) {
 	db := DBStorage{}
+	db.ctx = ctx
 	db.config = conf
+	db.logger = logger
+	db.buff = buff
 	if conf.DatabaseDSN == "" {
 		return &db, nil
 	}
-	db.logger = logger
-	db.buff = buff
 	dbConnect, err := sql.Open("pgx", db.config.DatabaseDSN)
 	db.dbConnect = dbConnect
 	return &db, err
@@ -121,20 +123,25 @@ func (ds *DBStorage) store(metric *types.MetricModel) error {
 		return err
 	}
 	tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
-	if !db.Migrator().HasTable(tableName) {
-		if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
-			return err
+	select {
+	case <-ds.ctx.Done():
+		return nil
+	default:
+		if !db.Migrator().HasTable(tableName) {
+			if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+				return err
+			}
 		}
+		db.Table(tableName).Create(metric)
+		return nil
 	}
-	db.Table(tableName).Create(metric)
-	return nil
 }
 
 func (ds *DBStorage) Ping() bool {
 	if ds.dbConnect == nil {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	if err := ds.dbConnect.PingContext(ctx); err != nil {
 		return false
@@ -143,25 +150,30 @@ func (ds *DBStorage) Ping() bool {
 }
 
 func (ds *DBStorage) storeBatch(metrics *[]types.MetricModel) error {
-	db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
-	if err != nil {
-		return err
-	}
+	select {
+	case <-ds.ctx.Done():
+		return nil
+	default:
+		db, err := gorm.Open(postgres.New(postgres.Config{Conn: ds.dbConnect}), &gorm.Config{})
+		if err != nil {
+			return err
+		}
 
-	if err := db.Transaction(func(tx *gorm.DB) error {
-		for _, metric := range *metrics {
-			tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
-			if !tx.Migrator().HasTable(tableName) {
-				if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
-					return err
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			for _, metric := range *metrics {
+				tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
+				if !tx.Migrator().HasTable(tableName) {
+					if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+						return err
+					}
 				}
+				tx.Table(tableName).Create(&metric)
 			}
-			tx.Table(tableName).Create(&metric)
+			return nil
+
+		}); err != nil {
+			return err
 		}
 		return nil
-
-	}); err != nil {
-		return err
 	}
-	return nil
 }
