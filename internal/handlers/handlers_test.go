@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetricStorage_GaugeHandler(t *testing.T) {
+func TestMetricsHandler_GaugeHandler(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
@@ -63,7 +63,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		MemStor: locStorage,
 	}
 
@@ -94,7 +94,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 	})
 }
 
-func TestMetricStorage_CounterHandler(t *testing.T) {
+func TestMetricsHandler_CounterHandler(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
@@ -139,7 +139,7 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		MemStor: locStorage,
 	}
 
@@ -170,13 +170,13 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 	})
 }
 
-func TestMetricStorage_GetAllHandler(t *testing.T) {
+func TestMetricsHandler_GetAllHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	stor["Sys"] = float64(0.0)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		MemStor: locStorage,
 	}
 
@@ -223,14 +223,14 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 	}
 }
 
-func TestMetricStorage_GetMetricHandler(t *testing.T) {
+func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	stor["PollCount"] = int64(4)
 	stor["Sys"] = float64(0.0)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.1)
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		MemStor: locStorage,
 	}
 

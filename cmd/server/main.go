@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -23,21 +22,18 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	memBuff := make(map[string]interface{}) // Основной буфер хранения метрик
 
-	fileStorage := filestorage.NewFileStorage(ctx, *serverConf, memBuff) // Файловый бекенд хранилища метрик
+	fileStorage := filestorage.NewFileStorage(*serverConf, memBuff) // Файловый бекенд хранилища метрик
 	defer fileStorage.Close()
 
-	dbStorage, err := dbstorage.NewDBStorage(ctx, *serverConf, logger, memBuff) // БД для метрик
+	dbStorage, err := dbstorage.NewDBStorage(*serverConf, logger, memBuff) // БД для метрик
 	if err != nil {
 		logger.Fatalln(err)
 	}
 	defer dbStorage.Close()
 
-	handlersStorage := handlers.MetricStorage{ // Хранилище метрик
+	handlerMetrics := handlers.MetricsHandler{ // Хранилище метрик
 		MemStor: storage.NewMemStorage(
 			storage.WithBuffer(memBuff),
 		),
@@ -50,16 +46,16 @@ func main() {
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
-	router.Get("/", handlersStorage.GetAllHandler)
-	router.Get("/value/*", handlersStorage.GetMetricHandler)
-	router.Get("/ping", handlersStorage.PingDB)
-	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
-	router.Post("/updates/", handlersStorage.UpdatesHandler)
+	router.Get("/", handlerMetrics.GetAllHandler)
+	router.Get("/value/*", handlerMetrics.GetMetricHandler)
+	router.Get("/ping", handlerMetrics.PingDB)
+	router.Post("/value/", handlerMetrics.GetMetricJSONHandler)
+	router.Post("/updates/", handlerMetrics.UpdatesHandler)
 
 	update := chi.NewRouter()
-	update.Post("/gauge/*", handlersStorage.GaugeHandler)
-	update.Post("/counter/*", handlersStorage.CounterHandler)
-	update.Post("/", handlersStorage.UpdateHandler)
+	update.Post("/gauge/*", handlerMetrics.GaugeHandler)
+	update.Post("/counter/*", handlerMetrics.CounterHandler)
+	update.Post("/", handlerMetrics.UpdateHandler)
 	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)

@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"context"
+	"log"
 	"strconv"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -13,47 +15,62 @@ type MemStorage struct {
 
 type Option func(mem *MemStorage) *MemStorage
 
-func (ms *MemStorage) Append(key string, value int64) {
-	var val int64
-	_, ok := ms.buffer[key]
-	if ok {
-		val = ms.buffer[key].(int64) + value
-	} else {
-		val = value
+func (ms *MemStorage) Append(ctx context.Context, key string, value int64) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		var val int64
+		_, ok := ms.buffer[key]
+		if ok {
+			val = ms.buffer[key].(int64) + value
+		} else {
+			val = value
+		}
+		ms.buffer[key] = val
 	}
-	ms.buffer[key] = val
 }
 
-func (ms *MemStorage) Get(key string) interface{} {
-	val, ok := ms.buffer[key]
-	if ok {
-		return val
+func (ms *MemStorage) Get(ctx context.Context, key string) interface{} {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		val, ok := ms.buffer[key]
+		if ok {
+			return val
+		}
+		return nil
 	}
-	return nil
 }
 
-func (ms *MemStorage) GetAll() map[string]interface{} {
+func (ms *MemStorage) GetAll(ctx context.Context) map[string]interface{} {
 	return maps.Clone(ms.buffer)
 }
 
-func (ms *MemStorage) Rewrite(key string, value float64) {
+func (ms *MemStorage) Rewrite(ctx context.Context, key string, value float64) {
 	ms.buffer[key] = value
 }
 
-func (ms *MemStorage) StoreAll(metrics *[]types.Metric) {
-	for _, m := range *metrics {
-		switch m.MType {
-		case "counter":
-			var val int64
-			_, ok := ms.buffer[m.ID]
-			if ok {
-				val = ms.buffer[m.ID].(int64) + *m.Delta
-			} else {
-				val = *m.Delta
+func (ms *MemStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		for _, m := range *metrics {
+			switch m.MType {
+			case "counter":
+				var val int64
+				_, ok := ms.buffer[m.ID]
+				if ok {
+					val = ms.buffer[m.ID].(int64) + *m.Delta
+				} else {
+					val = *m.Delta
+				}
+				ms.buffer[m.ID] = val
+			case "gauge":
+				ms.buffer[m.ID] = *m.Value
 			}
-			ms.buffer[m.ID] = val
-		case "gauge":
-			ms.buffer[m.ID] = *m.Value
 		}
 	}
 }
@@ -77,6 +94,14 @@ func WithBuffer(buffer map[string]interface{}) Option {
 		return mem
 	}
 }
+
+func (ms *MemStorage) Ping(ctx context.Context) bool {
+	return false
+}
+
+func (ms *MemStorage) Restore(ctx context.Context, logger log.Logger) {}
+
+func (ms *MemStorage) Storing(ctx context.Context, logger log.Logger) {}
 
 func StrToFloat64(input string) (float64, error) {
 	out, err := strconv.ParseFloat(input, 64)

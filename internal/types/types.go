@@ -1,6 +1,10 @@
 package types
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+	"log"
+)
 
 const DBtablePrefix = "pmetric_"
 
@@ -13,11 +17,20 @@ type Metric struct {
 }
 
 type Repository interface {
-	Append(key string, value int64)
-	Get(key string) interface{}
-	GetAll() map[string]interface{}
-	Rewrite(key string, value float64)
-	StoreAll(*[]Metric)
+	Append(ctx context.Context, key string, value int64)
+	Get(ctx context.Context, key string) interface{}
+	GetAll(ctx context.Context) map[string]interface{}
+	Rewrite(ctx context.Context, key string, value float64)
+	StoreAll(ctx context.Context, metrics *[]Metric)
+}
+
+type Pinger interface {
+	Ping(ctx context.Context) bool
+}
+
+type Storer interface {
+	Restore(ctx context.Context, logger log.Logger)
+	Storing(ctx context.Context, logger log.Logger)
 }
 
 type MetricModel struct {

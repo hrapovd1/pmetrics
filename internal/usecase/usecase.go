@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -16,7 +17,7 @@ const (
 	getMetricName = 3
 )
 
-func WriteMetric(path []string, repos ...types.Repository) error {
+func WriteMetric(ctx context.Context, path []string, repos ...types.Repository) error {
 	metricKey := path[metricName]
 	switch path[metricType] {
 	case "gauge":
@@ -24,7 +25,7 @@ func WriteMetric(path []string, repos ...types.Repository) error {
 		if err == nil {
 			for _, repo := range repos {
 				if repo != nil {
-					repo.Rewrite(metricKey, metricValue)
+					repo.Rewrite(ctx, metricKey, metricValue)
 				}
 			}
 		}
@@ -34,7 +35,7 @@ func WriteMetric(path []string, repos ...types.Repository) error {
 		if err == nil {
 			for _, repo := range repos {
 				if repo != nil {
-					repo.Append(metricKey, metricValue)
+					repo.Append(ctx, metricKey, metricValue)
 				}
 			}
 		}
@@ -44,14 +45,14 @@ func WriteMetric(path []string, repos ...types.Repository) error {
 	}
 }
 
-func GetMetric(repo types.Repository, path []string) (string, error) {
+func GetMetric(ctx context.Context, repo types.Repository, path []string) (string, error) {
 	metricType := path[getMetricType]
 	metric := path[getMetricName]
 	var metricValue string
 	var err error
 
 	if metricType == "gauge" || metricType == "counter" {
-		metricVal := repo.Get(metric)
+		metricVal := repo.Get(ctx, metric)
 		switch metricVal := metricVal.(type) {
 		case int64:
 			metricValue = fmt.Sprint(metricVal)
@@ -66,13 +67,13 @@ func GetMetric(repo types.Repository, path []string) (string, error) {
 	return metricValue, err
 }
 
-func WriteJSONMetric(data types.Metric, repos ...types.Repository) error {
+func WriteJSONMetric(ctx context.Context, data types.Metric, repos ...types.Repository) error {
 	switch data.MType {
 	case "gauge":
 		metricValue := *data.Value
 		for _, repo := range repos {
 			if repo != nil {
-				repo.Rewrite(data.ID, metricValue)
+				repo.Rewrite(ctx, data.ID, metricValue)
 			}
 		}
 		return nil
@@ -80,7 +81,7 @@ func WriteJSONMetric(data types.Metric, repos ...types.Repository) error {
 		metricValue := *data.Delta
 		for _, repo := range repos {
 			if repo != nil {
-				repo.Append(data.ID, metricValue)
+				repo.Append(ctx, data.ID, metricValue)
 			}
 		}
 		return nil
@@ -89,21 +90,21 @@ func WriteJSONMetric(data types.Metric, repos ...types.Repository) error {
 	}
 }
 
-func WriteJSONMetrics(data *[]types.Metric, repos ...types.Repository) error {
+func WriteJSONMetrics(ctx context.Context, data *[]types.Metric, repos ...types.Repository) error {
 	for _, repo := range repos {
 		if repo != nil {
-			repo.StoreAll(data)
+			repo.StoreAll(ctx, data)
 		}
 	}
 	return nil
 }
 
-func GetJSONMetric(repo types.Repository, data *types.Metric) error {
+func GetJSONMetric(ctx context.Context, repo types.Repository, data *types.Metric) error {
 	var err error
 
 	switch data.MType {
 	case "gauge":
-		val := repo.Get(data.ID)
+		val := repo.Get(ctx, data.ID)
 		if val == nil {
 			return errors.New("not found")
 		}
@@ -111,7 +112,7 @@ func GetJSONMetric(repo types.Repository, data *types.Metric) error {
 		data.Value = &value
 		err = nil
 	case "counter":
-		val := repo.Get(data.ID)
+		val := repo.Get(ctx, data.ID)
 		if val == nil {
 			return errors.New("not found")
 		}
@@ -124,10 +125,10 @@ func GetJSONMetric(repo types.Repository, data *types.Metric) error {
 	return err
 }
 
-func GetTableMetrics(repo types.Repository) map[string]string {
+func GetTableMetrics(ctx context.Context, repo types.Repository) map[string]string {
 	outTable := make(map[string]string)
 
-	for k, v := range repo.GetAll() {
+	for k, v := range repo.GetAll(ctx) {
 		switch value := v.(type) {
 		case int64:
 			outTable[k] = fmt.Sprint(value)

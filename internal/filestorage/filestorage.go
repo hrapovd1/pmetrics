@@ -15,37 +15,32 @@ import (
 type FileStorage struct {
 	file   *os.File
 	writer *bufio.Writer
-	ctx    context.Context
-	config config.Config
 	buff   map[string]interface{}
 }
 
-func (fs *FileStorage) Append(key string, value int64) {
+func (fs *FileStorage) Append(ctx context.Context, key string, value int64) {
 }
 
-func (fs *FileStorage) Get(key string) interface{} {
+func (fs *FileStorage) Get(ctx context.Context, key string) interface{} {
 	return nil
 }
 
-func (fs *FileStorage) GetAll() map[string]interface{} {
+func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
 	return nil
 }
 
-func (fs *FileStorage) Rewrite(key string, value float64) {
+func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
 }
 
-func (fs *FileStorage) StoreAll(metric *[]types.Metric) {
+func (fs *FileStorage) StoreAll(ctx context.Context, metric *[]types.Metric) {
 }
 
-func NewFileStorage(ctx context.Context, conf config.Config, buff map[string]interface{}) *FileStorage {
+func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
 	fs := &FileStorage{}
-	fs.ctx = ctx
 	var err error
-	fs.config = conf
 	if conf.StoreFile == "" {
 		fs.file = nil
 		fs.writer = nil
-		fs.config.IsRestore = false
 		return fs
 	}
 	fs.buff = buff
@@ -70,13 +65,17 @@ func (fs *FileStorage) Close() error {
 	return nil
 }
 
-func (fs *FileStorage) Restore() error {
+func (fs *FileStorage) Ping(ctx context.Context) bool {
+	return false
+}
+
+func (fs *FileStorage) Restore(ctx context.Context) error {
 	var err error
 	var data []byte
 	metrics := make([]types.Metric, 0)
 	scan := bufio.NewScanner(fs.file)
 	select {
-	case <-fs.ctx.Done():
+	case <-ctx.Done():
 		return nil
 	default:
 		for scan.Scan() {
@@ -95,10 +94,10 @@ func (fs *FileStorage) Restore() error {
 	}
 }
 
-func (fs *FileStorage) Store() error {
+func (fs *FileStorage) Store(ctx context.Context) error {
 	metrics := make([]types.Metric, 0)
 	select {
-	case <-fs.ctx.Done():
+	case <-ctx.Done():
 		return nil
 	default:
 		for k, v := range fs.buff {
@@ -127,16 +126,8 @@ func (fs *FileStorage) Store() error {
 	}
 }
 
-func (fs *FileStorage) Storing(logger *log.Logger) {
+func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger) {
 	defer fs.Close()
-	if fs.config.StoreFile == "" {
-		return
-	}
-	if fs.config.IsRestore {
-		if err := fs.Restore(); err != nil {
-			logger.Println(err)
-		}
-	}
 	var storeInterval time.Duration
 	if fs.config.StoreInterval > 0 {
 		storeInterval = fs.config.StoreInterval
@@ -147,10 +138,10 @@ func (fs *FileStorage) Storing(logger *log.Logger) {
 	defer storeTick.Stop()
 	for {
 		select {
-		case <-fs.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-storeTick.C:
-			if err := fs.Store(); err != nil {
+			if err := fs.Store(ctx); err != nil {
 				logger.Println(err)
 			}
 		}

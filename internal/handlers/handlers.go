@@ -1,15 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
 	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
+	"github.com/hrapovd1/pmetrics/internal/filestorage"
+	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
 	"github.com/hrapovd1/pmetrics/templates/core"
@@ -20,14 +24,39 @@ const (
 	getPathLen = 4
 )
 
-type MetricStorage struct {
-	MemStor  types.Repository
-	FileStor types.Repository
-	DBStor   types.Repository
-	Config   config.Config
+type MetricsHandler struct {
+	Storage types.Repository
+	Config  config.Config
 }
 
-func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
+func NewMetricsHandler(conf config.Config, logger log.Logger) *MetricsHandler {
+	mh := &MetricsHandler{Config: conf}
+	buff := make(map[string]interface{})
+	fs := &filestorage.FileStorage{}
+	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN != "" {
+		fs = filestorage.NewFileStorage(conf, buff)
+		db, err := dbstorage.NewDBStorage(mh.Config, &logger, buff, fs)
+		logger.Fatal(err)
+		mh.Storage = db
+	}
+	if mh.Config.DatabaseDSN != "" && mh.Config.StoreFile == "" {
+		db, err := dbstorage.NewDBStorage(mh.Config, &logger, buff, fs)
+		logger.Fatal(err)
+		mh.Storage = db
+	}
+	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN == "" {
+		fs = filestorage.NewFileStorage(conf, buff)
+		mh.Storage = fs
+	}
+	if mh.Config.DatabaseDSN == "" && mh.Config.StoreFile == "" {
+		ms := storage.NewMemStorage(storage.WithBuffer(buff))
+	}
+	return mh
+}
+
+func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -42,8 +71,8 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	// check metric hash in data.
-	if ms.Config.Key != "" {
-		if !usecase.IsSignEqual(data, ms.Config.Key) {
+	if mh.Config.Key != "" {
+		if !usecase.IsSignEqual(data, mh.Config.Key) {
 			http.Error(rw, "sign metric is bad", http.StatusBadRequest)
 			return
 		}
@@ -51,9 +80,10 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 
 	// Write new metrics value
 	err = usecase.WriteJSONMetric(
+		ctx,
 		data,
-		ms.MemStor,
-		ms.DBStor,
+		mh.MemStor,
+		mh.DBStor,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -61,15 +91,15 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get metric value for response
-	err = usecase.GetJSONMetric(ms.MemStor, &data)
+	err = usecase.GetJSONMetric(ctx, mh.MemStor, &data)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// sign metric with hash in data.
-	if ms.Config.Key != "" {
-		err := usecase.SignData(&data, ms.Config.Key)
+	if mh.Config.Key != "" {
+		err := usecase.SignData(&data, mh.Config.Key)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
@@ -90,7 +120,9 @@ func (ms *MetricStorage) UpdateHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -105,9 +137,9 @@ func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	// check metric hash in data.
-	if ms.Config.Key != "" {
+	if mh.Config.Key != "" {
 		for _, item := range data {
-			if !usecase.IsSignEqual(item, ms.Config.Key) {
+			if !usecase.IsSignEqual(item, mh.Config.Key) {
 				http.Error(rw, "sign metric is bad", http.StatusBadRequest)
 				return
 			}
@@ -116,9 +148,10 @@ func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request)
 
 	// Write new metrics value
 	err = usecase.WriteJSONMetrics(
+		ctx,
 		&data,
-		ms.MemStor,
-		ms.DBStor,
+		mh.MemStor,
+		mh.DBStor,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -134,7 +167,9 @@ func (ms *MetricStorage) UpdatesHandler(rw http.ResponseWriter, r *http.Request)
 
 }
 
-func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -149,14 +184,14 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 	}
 
 	// Get metric value for response
-	if err = usecase.GetJSONMetric(ms.MemStor, &data); err != nil {
+	if err = usecase.GetJSONMetric(ctx, mh.MemStor, &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	// sign metric with hash in data.
-	if ms.Config.Key != "" {
-		err := usecase.SignData(&data, ms.Config.Key)
+	if mh.Config.Key != "" {
+		err := usecase.SignData(&data, mh.Config.Key)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
@@ -178,7 +213,9 @@ func (ms *MetricStorage) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Re
 	}
 }
 
-func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -197,9 +234,10 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	err = usecase.WriteMetric(
+		ctx,
 		splitedPath,
-		ms.MemStor,
-		ms.DBStor,
+		mh.MemStor,
+		mh.DBStor,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -214,7 +252,9 @@ func (ms *MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) CounterHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	if r.Method != http.MethodPost {
 		http.Error(rw, "Only POST requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -233,9 +273,10 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	err = usecase.WriteMetric(
+		ctx,
 		splitedPath,
-		ms.MemStor,
-		ms.DBStor,
+		mh.MemStor,
+		mh.DBStor,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -250,7 +291,9 @@ func (ms *MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	if r.Method != http.MethodGet {
 		http.Error(rw, "Only GET requests are allowed.", http.StatusMethodNotAllowed)
 		return
@@ -263,7 +306,7 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	metricVal, err := usecase.GetMetric(ms.MemStor, splitedPath)
+	metricVal, err := usecase.GetMetric(ctx, mh.MemStor, splitedPath)
 	if err != nil {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)
 		return
@@ -282,13 +325,15 @@ func (ms *MetricStorage) GetMetricHandler(rw http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) {
+func (mh *MetricsHandler) GetAllHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	if r.Method != http.MethodGet {
 		http.Error(rw, "Only GET requests are allowed.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	outTable := usecase.GetTableMetrics(ms.MemStor)
+	outTable := usecase.GetTableMetrics(ctx, mh.MemStor)
 
 	indexTmplt, err := template.ParseFS(core.Index, "index.html")
 	if err != nil {
@@ -305,9 +350,11 @@ func (ms *MetricStorage) GetAllHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (ms *MetricStorage) PingDB(rw http.ResponseWriter, r *http.Request) {
-	dbstor := ms.DBStor.(*dbstorage.DBStorage)
-	if !dbstor.Ping() {
+func (mh *MetricsHandler) PingDB(rw http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	dbstor := mh.Storage.(types.Pinger)
+	if !dbstor.Ping(ctx) {
 		http.Error(rw, "DB connect is NOT ok", http.StatusInternalServerError)
 		return
 	}
