@@ -94,6 +94,7 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 		return nil
 	default:
 		buff := fs.ms.GetAll(ctx)
+		log.Printf("FileStorage.Store.buff = %v", buff)
 		for k, v := range buff {
 			metric := types.Metric{ID: k}
 			switch val := v.(type) {
