@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"time"
 )
 
 const DBtablePrefix = "pmetric_"
@@ -24,13 +25,11 @@ type Repository interface {
 	StoreAll(ctx context.Context, metrics *[]Metric)
 }
 
-type Pinger interface {
+type Storager interface {
+	Close() error
 	Ping(ctx context.Context) bool
-}
-
-type Storer interface {
-	Restore(ctx context.Context, logger log.Logger)
-	Storing(ctx context.Context, logger log.Logger)
+	Restore(ctx context.Context) error
+	Storing(ctx context.Context, logger *log.Logger, interval time.Duration)
 }
 
 type MetricModel struct {

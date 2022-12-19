@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hrapovd1/pmetrics/internal/config"
-	"github.com/hrapovd1/pmetrics/internal/filestorage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -16,26 +14,19 @@ import (
 
 type DBStorage struct {
 	dbConnect *sql.DB
-	buff      map[string]interface{}
 	logger    *log.Logger
-	fileStor  *filestorage.FileStorage
+	backStor  types.Repository
 }
 
 func (ds *DBStorage) Append(ctx context.Context, key string, value int64) {
-	if ds.dbConnect == nil {
-		return
-	}
-	var val int64
-	_, ok := ds.buff[key]
-	if ok {
-		val = ds.buff[key].(int64) + value
-	} else {
-		val = value
-	}
+	ds.backStor.Append(ctx, key, value)
 	metric := types.MetricModel{
 		ID:    key,
 		Mtype: "counter",
-		Delta: sql.NullInt64{Int64: val, Valid: true},
+		Delta: sql.NullInt64{
+			Int64: ds.backStor.Get(ctx, key).(int64),
+			Valid: true,
+		},
 	}
 	if err := ds.store(ctx, &metric); err != nil {
 		if ds.logger != nil {
@@ -45,24 +36,23 @@ func (ds *DBStorage) Append(ctx context.Context, key string, value int64) {
 }
 
 func (ds *DBStorage) Get(ctx context.Context, key string) interface{} {
-	return nil
+	return ds.backStor.Get(ctx, key)
 }
 
 func (ds *DBStorage) GetAll(ctx context.Context) map[string]interface{} {
-	return nil
+	return ds.backStor.GetAll(ctx)
 }
 
 func (ds *DBStorage) Rewrite(ctx context.Context, key string, value float64) {
-	if ds.dbConnect != nil {
-		metric := types.MetricModel{
-			ID:    key,
-			Mtype: "gauge",
-			Value: sql.NullFloat64{Float64: value, Valid: true},
-		}
-		if err := ds.store(ctx, &metric); err != nil {
-			if ds.logger != nil {
-				ds.logger.Println(err)
-			}
+	ds.backStor.Rewrite(ctx, key, value)
+	metric := types.MetricModel{
+		ID:    key,
+		Mtype: "gauge",
+		Value: sql.NullFloat64{Float64: value, Valid: true},
+	}
+	if err := ds.store(ctx, &metric); err != nil {
+		if ds.logger != nil {
+			ds.logger.Println(err)
 		}
 	}
 }
@@ -73,14 +63,11 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 		metricDB := types.MetricModel{ID: m.ID, Mtype: m.MType}
 		switch m.MType {
 		case "counter":
-			var val int64
-			_, ok := ds.buff[m.ID]
-			if ok {
-				val = ds.buff[m.ID].(int64) + *m.Delta
-			} else {
-				val = *m.Delta
+			ds.backStor.Append(ctx, m.ID, *m.Delta)
+			metricDB.Delta = sql.NullInt64{
+				Int64: ds.backStor.Get(ctx, m.ID).(int64),
+				Valid: true,
 			}
-			metricDB.Delta = sql.NullInt64{Int64: val, Valid: true}
 		case "gauge":
 			metricDB.Value = sql.NullFloat64{Float64: *m.Value, Valid: true}
 		}
@@ -93,25 +80,14 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 	}
 }
 
-func NewDBStorage(conf config.Config, logger *log.Logger, buff map[string]interface{}, fs *filestorage.FileStorage) (*DBStorage, error) {
-	db := DBStorage{}
-	db.logger = logger
-	db.buff = buff
-	db.fileStor = fs
-	if conf.DatabaseDSN == "" {
-		return &db, nil
+func NewDBStorage(dsn string, logger *log.Logger, backStor types.Repository) (*DBStorage, error) {
+	db := DBStorage{
+		logger:   logger,
+		backStor: backStor,
 	}
-	dbConnect, err := sql.Open("pgx", conf.DatabaseDSN)
+	dbConnect, err := sql.Open("pgx", dsn)
 	db.dbConnect = dbConnect
 	return &db, err
-}
-
-func (ds *DBStorage) Storing(ctx context.Context, logger log.Logger) {}
-
-func (ds *DBStorage) Close() {
-	if ds.dbConnect != nil {
-		ds.dbConnect.Close()
-	}
 }
 
 func (ds *DBStorage) store(ctx context.Context, metric *types.MetricModel) error {
@@ -132,18 +108,6 @@ func (ds *DBStorage) store(ctx context.Context, metric *types.MetricModel) error
 		db.Table(tableName).Create(metric)
 		return nil
 	}
-}
-
-func (ds *DBStorage) Ping(ctx context.Context) bool {
-	if ds.dbConnect == nil {
-		return false
-	}
-	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-	if err := ds.dbConnect.PingContext(ctxT); err != nil {
-		return false
-	}
-	return true
 }
 
 func (ds *DBStorage) storeBatch(ctx context.Context, metrics *[]types.MetricModel) error {
@@ -173,4 +137,32 @@ func (ds *DBStorage) storeBatch(ctx context.Context, metrics *[]types.MetricMode
 		}
 		return nil
 	}
+}
+
+func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration) {
+	stor := ds.backStor.(types.Storager)
+	stor.Storing(ctx, logger, interval)
+}
+
+func (ds *DBStorage) Close() error {
+	stor := ds.backStor.(types.Storager)
+	defer stor.Close()
+	return ds.dbConnect.Close()
+}
+
+func (ds *DBStorage) Ping(ctx context.Context) bool {
+	if ds.dbConnect == nil {
+		return false
+	}
+	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	if err := ds.dbConnect.PingContext(ctxT); err != nil {
+		return false
+	}
+	return true
+}
+
+func (ds *DBStorage) Restore(ctx context.Context) error {
+	stor := ds.backStor.(types.Storager)
+	return stor.Restore(ctx)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -63,8 +64,9 @@ func TestMetricsHandler_GaugeHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	ctx := context.Background()
 	ms := MetricsHandler{
-		MemStor: locStorage,
+		Storage: locStorage,
 	}
 
 	for _, test := range tests {
@@ -81,7 +83,7 @@ func TestMetricsHandler_GaugeHandler(t *testing.T) {
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				metric := locStorage.Get(test.metric)
+				metric := locStorage.Get(ctx, test.metric)
 				require.NotNil(t, metric)
 				assert.Equal(t, test.want, metric.(float64))
 			} else {
@@ -139,8 +141,9 @@ func TestMetricsHandler_CounterHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	ctx := context.Background()
 	ms := MetricsHandler{
-		MemStor: locStorage,
+		Storage: locStorage,
 	}
 
 	for _, test := range tests {
@@ -157,7 +160,7 @@ func TestMetricsHandler_CounterHandler(t *testing.T) {
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				pollCount := locStorage.Get("PollCount")
+				pollCount := locStorage.Get(ctx, "PollCount")
 				require.NotNil(t, pollCount)
 				assert.Equal(t, test.want, pollCount.(int64))
 			} else {
@@ -177,7 +180,7 @@ func TestMetricsHandler_GetAllHandler(t *testing.T) {
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
 	ms := MetricsHandler{
-		MemStor: locStorage,
+		Storage: locStorage,
 	}
 
 	reqst := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -231,7 +234,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.1)
 	ms := MetricsHandler{
-		MemStor: locStorage,
+		Storage: locStorage,
 	}
 
 	tests := []struct {

@@ -29,27 +29,42 @@ type MetricsHandler struct {
 	Config  config.Config
 }
 
-func NewMetricsHandler(conf config.Config, logger log.Logger) *MetricsHandler {
+func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 	mh := &MetricsHandler{Config: conf}
-	buff := make(map[string]interface{})
 	fs := &filestorage.FileStorage{}
+	// Have mem, fs and db storage
 	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN != "" {
-		fs = filestorage.NewFileStorage(conf, buff)
-		db, err := dbstorage.NewDBStorage(mh.Config, &logger, buff, fs)
-		logger.Fatal(err)
+		db, err := dbstorage.NewDBStorage(
+			conf.DatabaseDSN,
+			logger,
+			filestorage.NewFileStorage(conf, make(map[string]interface{})),
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
 		mh.Storage = db
 	}
+	// Have mem and db storage
 	if mh.Config.DatabaseDSN != "" && mh.Config.StoreFile == "" {
-		db, err := dbstorage.NewDBStorage(mh.Config, &logger, buff, fs)
-		logger.Fatal(err)
+		db, err := dbstorage.NewDBStorage(
+			conf.DatabaseDSN,
+			logger,
+			storage.NewMemStorage(),
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
 		mh.Storage = db
 	}
+	// Have mem and fs storage
 	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN == "" {
-		fs = filestorage.NewFileStorage(conf, buff)
+		fs = filestorage.NewFileStorage(conf, make(map[string]interface{}))
 		mh.Storage = fs
 	}
+	// Have mem storage
 	if mh.Config.DatabaseDSN == "" && mh.Config.StoreFile == "" {
-		ms := storage.NewMemStorage(storage.WithBuffer(buff))
+		ms := storage.NewMemStorage()
+		mh.Storage = ms
 	}
 	return mh
 }
@@ -82,8 +97,7 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 	err = usecase.WriteJSONMetric(
 		ctx,
 		data,
-		mh.MemStor,
-		mh.DBStor,
+		mh.Storage,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -91,7 +105,7 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 	}
 
 	// Get metric value for response
-	err = usecase.GetJSONMetric(ctx, mh.MemStor, &data)
+	err = usecase.GetJSONMetric(ctx, mh.Storage, &data)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -147,16 +161,11 @@ func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request
 	}
 
 	// Write new metrics value
-	err = usecase.WriteJSONMetrics(
+	usecase.WriteJSONMetrics(
 		ctx,
 		&data,
-		mh.MemStor,
-		mh.DBStor,
+		mh.Storage,
 	)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write([]byte(""))
@@ -184,7 +193,7 @@ func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.R
 	}
 
 	// Get metric value for response
-	if err = usecase.GetJSONMetric(ctx, mh.MemStor, &data); err != nil {
+	if err = usecase.GetJSONMetric(ctx, mh.Storage, &data); err != nil {
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -236,8 +245,7 @@ func (mh *MetricsHandler) GaugeHandler(rw http.ResponseWriter, r *http.Request) 
 	err = usecase.WriteMetric(
 		ctx,
 		splitedPath,
-		mh.MemStor,
-		mh.DBStor,
+		mh.Storage,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -275,8 +283,7 @@ func (mh *MetricsHandler) CounterHandler(rw http.ResponseWriter, r *http.Request
 	err = usecase.WriteMetric(
 		ctx,
 		splitedPath,
-		mh.MemStor,
-		mh.DBStor,
+		mh.Storage,
 	)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -306,7 +313,7 @@ func (mh *MetricsHandler) GetMetricHandler(rw http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	metricVal, err := usecase.GetMetric(ctx, mh.MemStor, splitedPath)
+	metricVal, err := usecase.GetMetric(ctx, mh.Storage, splitedPath)
 	if err != nil {
 		http.Error(rw, "Metric is't implemented yet.", http.StatusNotImplemented)
 		return
@@ -333,7 +340,7 @@ func (mh *MetricsHandler) GetAllHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	outTable := usecase.GetTableMetrics(ctx, mh.MemStor)
+	outTable := usecase.GetTableMetrics(ctx, mh.Storage)
 
 	indexTmplt, err := template.ParseFS(core.Index, "index.html")
 	if err != nil {
@@ -353,7 +360,7 @@ func (mh *MetricsHandler) GetAllHandler(rw http.ResponseWriter, r *http.Request)
 func (mh *MetricsHandler) PingDB(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	dbstor := mh.Storage.(types.Pinger)
+	dbstor := mh.Storage.(types.Storager)
 	if !dbstor.Ping(ctx) {
 		http.Error(rw, "DB connect is NOT ok", http.StatusInternalServerError)
 		return

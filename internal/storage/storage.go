@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"golang.org/x/exp/maps"
@@ -99,10 +100,6 @@ func (ms *MemStorage) Ping(ctx context.Context) bool {
 	return false
 }
 
-func (ms *MemStorage) Restore(ctx context.Context, logger log.Logger) {}
-
-func (ms *MemStorage) Storing(ctx context.Context, logger log.Logger) {}
-
 func StrToFloat64(input string) (float64, error) {
 	out, err := strconv.ParseFloat(input, 64)
 	return out, err
@@ -112,3 +109,11 @@ func StrToInt64(input string) (int64, error) {
 	out, err := strconv.ParseInt(input, 10, 64)
 	return out, err
 }
+
+func Close() error { return nil }
+
+func Ping(ctx context.Context) bool { return false }
+
+func Restore(ctx context.Context) error { return nil }
+
+func Storing(ctx context.Context, logger log.Logger, interval time.Duration) {}

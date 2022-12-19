@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -26,9 +27,10 @@ func TestMemStorage_Rewrite(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	ms := NewMemStorage(WithBuffer(stor))
+	ctx := context.Background()
 	t.Run("Rewrite values.", func(t *testing.T) {
 		for _, tt := range tests {
-			ms.Rewrite(tt.key, tt.value)
+			ms.Rewrite(ctx, tt.key, tt.value)
 			assert.Equal(t, tt.value, stor[tt.key])
 		}
 	})
@@ -57,9 +59,10 @@ func TestMemStorage_Append(t *testing.T) {
 	}
 	stor := make(map[string]interface{})
 	ms := NewMemStorage(WithBuffer(stor))
+	ctx := context.Background()
 	for _, test := range tests {
 		t.Run("Append values", func(t *testing.T) {
-			ms.Append(test.key, test.value)
+			ms.Append(ctx, test.key, test.value)
 			assert.Equal(t, test.value, stor[test.key].(int64))
 		})
 	}
@@ -70,6 +73,7 @@ func TestMemStorage_Append(t *testing.T) {
 
 func TestMemStorage_Get(t *testing.T) {
 	stor := make(map[string]interface{})
+	ctx := context.Background()
 	ms := NewMemStorage(WithBuffer(stor))
 	stor["PollCount"] = int64(1)
 	stor["Alloc"] = float64(3.0)
@@ -114,7 +118,7 @@ func TestMemStorage_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.positive {
-				metric := ms.Get(tt.name)
+				metric := ms.Get(ctx, tt.name)
 				require.NotNil(t, metric)
 				if tt.pcount {
 					assert.Equal(t, tt.want2, metric.(int64))
@@ -122,7 +126,7 @@ func TestMemStorage_Get(t *testing.T) {
 					assert.Equal(t, tt.want1, metric.(float64))
 				}
 			} else {
-				metric := ms.Get(tt.name)
+				metric := ms.Get(ctx, tt.name)
 				require.Nil(t, metric)
 			}
 		})
@@ -132,11 +136,12 @@ func TestMemStorage_Get(t *testing.T) {
 func TestMemStorage_GetAll(t *testing.T) {
 	stor := make(map[string]interface{})
 	ms := NewMemStorage(WithBuffer(stor))
+	ctx := context.Background()
 	stor["PollCount"] = []int64{4}
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
 	t.Run("Check GetAll", func(t *testing.T) {
-		out := ms.GetAll()
+		out := ms.GetAll(ctx)
 		assert.True(t, cmp.Equal(stor, out))
 	})
 }

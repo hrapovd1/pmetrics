@@ -9,41 +9,43 @@ import (
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
+	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
 type FileStorage struct {
 	file   *os.File
 	writer *bufio.Writer
-	buff   map[string]interface{}
+	ms     *storage.MemStorage
 }
 
 func (fs *FileStorage) Append(ctx context.Context, key string, value int64) {
+	fs.ms.Append(ctx, key, value)
 }
 
 func (fs *FileStorage) Get(ctx context.Context, key string) interface{} {
-	return nil
+	return fs.ms.Get(ctx, key)
 }
 
 func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
-	return nil
+	return fs.ms.GetAll(ctx)
 }
 
 func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
+	fs.ms.Rewrite(ctx, key, value)
 }
 
-func (fs *FileStorage) StoreAll(ctx context.Context, metric *[]types.Metric) {
+func (fs *FileStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
+	fs.ms.StoreAll(ctx, metrics)
 }
 
 func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
-	fs := &FileStorage{}
-	var err error
-	if conf.StoreFile == "" {
-		fs.file = nil
-		fs.writer = nil
-		return fs
+	fs := &FileStorage{
+		ms: storage.NewMemStorage(
+			storage.WithBuffer(buff),
+		),
 	}
-	fs.buff = buff
+	var err error
 	fileOptions := os.O_RDWR | os.O_CREATE | os.O_APPEND
 	if conf.StoreInterval == 0 {
 		fileOptions = fileOptions | os.O_SYNC
@@ -59,10 +61,7 @@ func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorag
 }
 
 func (fs *FileStorage) Close() error {
-	if fs.file != nil {
-		return fs.file.Close()
-	}
-	return nil
+	return fs.file.Close()
 }
 
 func (fs *FileStorage) Ping(ctx context.Context) bool {
@@ -82,14 +81,7 @@ func (fs *FileStorage) Restore(ctx context.Context) error {
 			data = scan.Bytes()
 		}
 		err = json.Unmarshal(data, &metrics)
-		for _, metric := range metrics {
-			switch metric.MType {
-			case "gauge":
-				fs.buff[metric.ID] = *metric.Value
-			case "counter":
-				fs.buff[metric.ID] = *metric.Delta
-			}
-		}
+		fs.ms.StoreAll(ctx, &metrics)
 		return err
 	}
 }
@@ -100,7 +92,8 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 	case <-ctx.Done():
 		return nil
 	default:
-		for k, v := range fs.buff {
+		buff := fs.ms.GetAll(ctx)
+		for k, v := range buff {
 			metric := types.Metric{ID: k}
 			switch val := v.(type) {
 			case int64:
@@ -126,15 +119,9 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 	}
 }
 
-func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger) {
+func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration) {
 	defer fs.Close()
-	var storeInterval time.Duration
-	if fs.config.StoreInterval > 0 {
-		storeInterval = fs.config.StoreInterval
-	} else {
-		storeInterval = fs.config.ReportInterval
-	}
-	storeTick := time.NewTicker(storeInterval)
+	storeTick := time.NewTicker(interval)
 	defer storeTick.Stop()
 	for {
 		select {

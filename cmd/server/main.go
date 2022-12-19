@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -8,10 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
-	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
-	"github.com/hrapovd1/pmetrics/internal/filestorage"
 	"github.com/hrapovd1/pmetrics/internal/handlers"
-	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
 func main() {
@@ -22,27 +21,11 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	memBuff := make(map[string]interface{}) // Основной буфер хранения метрик
+	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
+	handlerStorage := handlerMetrics.Storage.(types.Storager)
+	defer handlerStorage.Close()
 
-	fileStorage := filestorage.NewFileStorage(*serverConf, memBuff) // Файловый бекенд хранилища метрик
-	defer fileStorage.Close()
-
-	dbStorage, err := dbstorage.NewDBStorage(*serverConf, logger, memBuff) // БД для метрик
-	if err != nil {
-		logger.Fatalln(err)
-	}
-	defer dbStorage.Close()
-
-	handlerMetrics := handlers.MetricsHandler{ // Хранилище метрик
-		MemStor: storage.NewMemStorage(
-			storage.WithBuffer(memBuff),
-		),
-		FileStor: fileStorage,
-		DBStor:   dbStorage,
-		Config:   *serverConf,
-	}
-
-	go fileStorage.Storing(logger)
+	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)

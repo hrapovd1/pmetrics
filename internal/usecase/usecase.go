@@ -17,27 +17,19 @@ const (
 	getMetricName = 3
 )
 
-func WriteMetric(ctx context.Context, path []string, repos ...types.Repository) error {
+func WriteMetric(ctx context.Context, path []string, repo types.Repository) error {
 	metricKey := path[metricName]
 	switch path[metricType] {
 	case "gauge":
 		metricValue, err := storage.StrToFloat64(path[metricVal])
 		if err == nil {
-			for _, repo := range repos {
-				if repo != nil {
-					repo.Rewrite(ctx, metricKey, metricValue)
-				}
-			}
+			repo.Rewrite(ctx, metricKey, metricValue)
 		}
 		return err
 	case "counter":
 		metricValue, err := storage.StrToInt64(path[metricVal])
 		if err == nil {
-			for _, repo := range repos {
-				if repo != nil {
-					repo.Append(ctx, metricKey, metricValue)
-				}
-			}
+			repo.Append(ctx, metricKey, metricValue)
 		}
 		return err
 	default:
@@ -67,36 +59,21 @@ func GetMetric(ctx context.Context, repo types.Repository, path []string) (strin
 	return metricValue, err
 }
 
-func WriteJSONMetric(ctx context.Context, data types.Metric, repos ...types.Repository) error {
+func WriteJSONMetric(ctx context.Context, data types.Metric, repo types.Repository) error {
 	switch data.MType {
 	case "gauge":
-		metricValue := *data.Value
-		for _, repo := range repos {
-			if repo != nil {
-				repo.Rewrite(ctx, data.ID, metricValue)
-			}
-		}
+		repo.Rewrite(ctx, data.ID, *data.Value)
 		return nil
 	case "counter":
-		metricValue := *data.Delta
-		for _, repo := range repos {
-			if repo != nil {
-				repo.Append(ctx, data.ID, metricValue)
-			}
-		}
+		repo.Append(ctx, data.ID, *data.Delta)
 		return nil
 	default:
 		return errors.New("undefined metric type")
 	}
 }
 
-func WriteJSONMetrics(ctx context.Context, data *[]types.Metric, repos ...types.Repository) error {
-	for _, repo := range repos {
-		if repo != nil {
-			repo.StoreAll(ctx, data)
-		}
-	}
-	return nil
+func WriteJSONMetrics(ctx context.Context, data *[]types.Metric, repo types.Repository) {
+	repo.StoreAll(ctx, data)
 }
 
 func GetJSONMetric(ctx context.Context, repo types.Repository, data *types.Metric) error {
