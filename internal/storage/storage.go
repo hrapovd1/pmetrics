@@ -116,4 +116,4 @@ func Ping(ctx context.Context) bool { return false }
 
 func Restore(ctx context.Context) error { return nil }
 
-func Storing(ctx context.Context, logger log.Logger, interval time.Duration) {}
+func Storing(ctx context.Context, logger *log.Logger, interval time.Duration) {}

@@ -31,7 +31,7 @@ type MetricsHandler struct {
 
 func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 	mh := &MetricsHandler{Config: conf}
-	fs := &filestorage.FileStorage{}
+	var fs *filestorage.FileStorage
 	// Have mem, fs and db storage
 	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN != "" {
 		db, err := dbstorage.NewDBStorage(

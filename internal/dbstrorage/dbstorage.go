@@ -69,6 +69,7 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 				Valid: true,
 			}
 		case "gauge":
+			ds.backStor.Rewrite(ctx, m.ID, *m.Value)
 			metricDB.Value = sql.NullFloat64{Float64: *m.Value, Valid: true}
 		}
 		metricsDB = append(metricsDB, metricDB)
