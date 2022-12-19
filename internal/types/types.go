@@ -29,7 +29,7 @@ type Storager interface {
 	Close() error
 	Ping(ctx context.Context) bool
 	Restore(ctx context.Context) error
-	Storing(ctx context.Context, logger *log.Logger, interval time.Duration)
+	Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool)
 }
 
 type MetricModel struct {

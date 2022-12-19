@@ -141,9 +141,9 @@ func (ds *DBStorage) storeBatch(ctx context.Context, metrics *[]types.MetricMode
 	}
 }
 
-func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration) {
+func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
 	stor := ds.backStor.(types.Storager)
-	stor.Storing(ctx, logger, interval)
+	stor.Storing(ctx, logger, interval, restore)
 }
 
 func (ds *DBStorage) Close() error {

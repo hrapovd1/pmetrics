@@ -27,7 +27,7 @@ func main() {
 	handlerStorage := handlerMetrics.Storage.(types.Storager)
 	defer handlerStorage.Close()
 
-	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval)
+	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
