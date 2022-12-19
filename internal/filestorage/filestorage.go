@@ -32,6 +32,7 @@ func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
 }
 
 func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
+	log.Printf("Rewrite FileStorage gauge: %v, %v", key, value)
 	fs.ms.Rewrite(ctx, key, value)
 }
 

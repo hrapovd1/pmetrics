@@ -44,6 +44,7 @@ func (ds *DBStorage) GetAll(ctx context.Context) map[string]interface{} {
 }
 
 func (ds *DBStorage) Rewrite(ctx context.Context, key string, value float64) {
+	log.Printf("Rewrite DBStorage gauge: %v, %v", key, value)
 	ds.backStor.Rewrite(ctx, key, value)
 	metric := types.MetricModel{
 		ID:    key,

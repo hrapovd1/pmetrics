@@ -50,6 +50,7 @@ func (ms *MemStorage) GetAll(ctx context.Context) map[string]interface{} {
 }
 
 func (ms *MemStorage) Rewrite(ctx context.Context, key string, value float64) {
+	log.Printf("Rewrite MemStorage gauge: %v, %v", key, value)
 	ms.buffer[key] = value
 }
 
