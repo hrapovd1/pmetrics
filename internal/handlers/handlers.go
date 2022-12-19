@@ -106,8 +106,6 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 
 	// Get metric value for response
 	err = usecase.GetJSONMetric(ctx, mh.Storage, &data)
-	log.Printf("UpdateHandler: data = %v", data)
-	log.Printf("UpdateHandler: mh.Storage = %v", mh.Storage)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -196,8 +194,6 @@ func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.R
 
 	// Get metric value for response
 	if err = usecase.GetJSONMetric(ctx, mh.Storage, &data); err != nil {
-		log.Printf("GetMetricJSONHandler: data = %v", data)
-		log.Printf("GetMetricJSONHandler: mh.Storage = %v", mh.Storage)
 		http.Error(rw, err.Error(), http.StatusNotFound)
 		return
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -63,7 +62,6 @@ func GetMetric(ctx context.Context, repo types.Repository, path []string) (strin
 func WriteJSONMetric(ctx context.Context, data types.Metric, repo types.Repository) error {
 	switch data.MType {
 	case "gauge":
-		log.Printf("WriteJSONMetric gauge: %v", data)
 		repo.Rewrite(ctx, data.ID, *data.Value)
 		return nil
 	case "counter":

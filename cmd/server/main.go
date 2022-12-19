@@ -21,8 +21,6 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	logger.Printf("serverConf: %v", serverConf)
-
 	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
 	handlerStorage := handlerMetrics.Storage.(types.Storager)
 	defer handlerStorage.Close()

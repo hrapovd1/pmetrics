@@ -32,7 +32,6 @@ func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
 }
 
 func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
-	log.Printf("Rewrite FileStorage gauge: %v, %v", key, value)
 	fs.ms.Rewrite(ctx, key, value)
 }
 
@@ -94,7 +93,6 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 		return nil
 	default:
 		buff := fs.ms.GetAll(ctx)
-		log.Printf("FileStorage.Store.buff = %v", buff)
 		for k, v := range buff {
 			metric := types.Metric{ID: k}
 			switch val := v.(type) {
