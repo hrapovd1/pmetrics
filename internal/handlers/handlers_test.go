@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetricStorage_GaugeHandler(t *testing.T) {
+func TestMetricsHandler_GaugeHandler(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
@@ -64,7 +64,8 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
-	ms := MetricStorage{
+	ctx := context.Background()
+	ms := MetricsHandler{
 		Storage: locStorage,
 	}
 
@@ -82,7 +83,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				metric := locStorage.Get(test.metric)
+				metric := locStorage.Get(ctx, test.metric)
 				require.NotNil(t, metric)
 				assert.Equal(t, test.want, metric.(float64))
 			} else {
@@ -95,7 +96,7 @@ func TestMetricStorage_GaugeHandler(t *testing.T) {
 	})
 }
 
-func TestMetricStorage_CounterHandler(t *testing.T) {
+func TestMetricsHandler_CounterHandler(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
@@ -140,7 +141,8 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
-	ms := MetricStorage{
+	ctx := context.Background()
+	ms := MetricsHandler{
 		Storage: locStorage,
 	}
 
@@ -153,13 +155,12 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 		hndl.ServeHTTP(rec, reqst)
 
 		t.Run(test.name, func(t *testing.T) {
-			log.Println(test.name, " ", test.path)
 			result := rec.Result()
 			defer result.Body.Close()
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
-				pollCount := locStorage.Get("PollCount")
+				pollCount := locStorage.Get(ctx, "PollCount")
 				require.NotNil(t, pollCount)
 				assert.Equal(t, test.want, pollCount.(int64))
 			} else {
@@ -172,13 +173,13 @@ func TestMetricStorage_CounterHandler(t *testing.T) {
 	})
 }
 
-func TestMetricStorage_GetAllHandler(t *testing.T) {
+func TestMetricsHandler_GetAllHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	stor["Sys"] = float64(0.0)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.0)
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		Storage: locStorage,
 	}
 
@@ -225,14 +226,14 @@ func TestMetricStorage_GetAllHandler(t *testing.T) {
 	}
 }
 
-func TestMetricStorage_GetMetricHandler(t *testing.T) {
+func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	stor["PollCount"] = int64(4)
 	stor["Sys"] = float64(0.0)
 	stor["Alloc"] = float64(3.0)
 	stor["TotalAlloc"] = float64(-3.1)
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		Storage: locStorage,
 	}
 

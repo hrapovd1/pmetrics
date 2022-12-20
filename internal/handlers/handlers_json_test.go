@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetricStorage_UpdateHandler(t *testing.T) {
+func TestMetricsHandler_UpdateHandler(t *testing.T) {
 	tests := []struct {
 		name        string
 		data        string
@@ -39,7 +39,7 @@ func TestMetricStorage_UpdateHandler(t *testing.T) {
 		},
 	}
 
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		Storage: storage.NewMemStorage(),
 	}
 
@@ -65,12 +65,12 @@ func TestMetricStorage_UpdateHandler(t *testing.T) {
 	}
 }
 
-func TestMetricStorage_GetMetricJSONHandler(t *testing.T) {
+func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	stor["PollCount"] = int64(4)
 	stor["Sys"] = float64(0.0)
-	ms := MetricStorage{
+	ms := MetricsHandler{
 		Storage: locStorage,
 	}
 

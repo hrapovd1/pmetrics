@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -9,36 +10,35 @@ import (
 
 	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/handlers"
-	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
 func main() {
 	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
 	// Чтение флагов и установка конфигурации сервера
-	serverConf, err := config.NewServer(config.GetServerFlags())
+	serverConf, err := config.NewServerConf(config.GetServerFlags())
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	backendStorage := storage.NewBackend(*serverConf) // Файловый бекенд хранилища метрик
-	handlersStorage := handlers.MetricStorage{        // Хранилище метрик
-		Storage: storage.NewMemStorage(storage.WithBackend(&backendStorage)),
-	}
 
-	donech := make(chan struct{})
-	defer close(donech)
+	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
+	handlerStorage := handlerMetrics.Storage.(types.Storager)
+	defer handlerStorage.Close()
 
-	go backendStorage.Storing(donech, logger)
+	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
-	router.Get("/", handlersStorage.GetAllHandler)
-	router.Get("/value/*", handlersStorage.GetMetricHandler)
-	router.Post("/value/", handlersStorage.GetMetricJSONHandler)
+	router.Get("/", handlerMetrics.GetAllHandler)
+	router.Get("/value/*", handlerMetrics.GetMetricHandler)
+	router.Get("/ping", handlerMetrics.PingDB)
+	router.Post("/value/", handlerMetrics.GetMetricJSONHandler)
+	router.Post("/updates/", handlerMetrics.UpdatesHandler)
 
 	update := chi.NewRouter()
-	update.Post("/gauge/*", handlersStorage.GaugeHandler)
-	update.Post("/counter/*", handlersStorage.CounterHandler)
-	update.Post("/", handlersStorage.UpdateHandler)
+	update.Post("/gauge/*", handlerMetrics.GaugeHandler)
+	update.Post("/counter/*", handlerMetrics.CounterHandler)
+	update.Post("/", handlerMetrics.UpdateHandler)
 	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)

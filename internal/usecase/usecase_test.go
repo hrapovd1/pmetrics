@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -31,12 +32,13 @@ func TestWriteJSONMetric(t *testing.T) {
 		},
 	}
 	stor := make(map[string]interface{})
+	ctx := context.Background()
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WriteJSONMetric(locStorage, tt.data)
+			err := WriteJSONMetric(ctx, tt.data, locStorage)
 			require.NoError(t, err)
-			switch result := locStorage.Get(tt.data.ID).(type) {
+			switch result := locStorage.Get(ctx, tt.data.ID).(type) {
 			case int64:
 				assert.Equal(t, tt.want, fmt.Sprint(result))
 			case float64:
@@ -76,10 +78,11 @@ func TestGetJSONMetric(t *testing.T) {
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(-4.65)
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	ctx := context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := GetJSONMetric(locStorage, &tt.data)
+			err := GetJSONMetric(ctx, locStorage, &tt.data)
 			if tt.withErr {
 				require.Error(t, err)
 			} else {
@@ -124,11 +127,12 @@ func TestWriteMetric(t *testing.T) {
 	}
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WriteMetric(locStorage, tt.path)
+			err := WriteMetric(ctx, tt.path, locStorage)
 			require.NoError(t, err)
-			switch result := locStorage.Get(tt.metricName).(type) {
+			switch result := locStorage.Get(ctx, tt.metricName).(type) {
 			case int64:
 				assert.Equal(t, tt.want, fmt.Sprint(result))
 			case float64:
@@ -179,10 +183,11 @@ func TestGetMetric(t *testing.T) {
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(0)
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
+	ctx := context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetMetric(locStorage, tt.path)
+			got, err := GetMetric(ctx, locStorage, tt.path)
 			if tt.withErr {
 				require.Error(t, err)
 			} else {
@@ -205,7 +210,8 @@ func TestGetTableMetrics(t *testing.T) {
 	stor["M1"] = int64(5)
 	stor["M2"] = float64(0)
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
-	result := GetTableMetrics(locStorage)
+	ctx := context.Background()
+	result := GetTableMetrics(ctx, locStorage)
 
 	t.Run(test.name, func(t *testing.T) {
 		assert.True(t, cmp.Equal(test.want, result))

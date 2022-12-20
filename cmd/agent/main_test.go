@@ -9,10 +9,10 @@ import (
 )
 
 func Test_pollMetrics(t *testing.T) {
-	testMetrics := make(map[string]gauge)
+	testMetrics := make(map[string]interface{})
 	test := struct {
 		name string
-		args map[string]gauge
+		args map[string]interface{}
 		want []string
 	}{
 		name: "Check metric names",
@@ -57,40 +57,28 @@ func Test_pollMetrics(t *testing.T) {
 	})
 }
 
-func Test_metricToJSON(t *testing.T) {
-	type value struct {
-		name    string
-		isGauge bool
-		val     gauge
-		del     counter
-	}
+func Test_metricsJSON(t *testing.T) {
 	tests := []struct {
-		name   string
-		metric value
-		want   []byte
+		name    string
+		metrics map[string]interface{}
+		want    []byte
+		wantn   []byte
 	}{
 		{
-			name:   "Check gauge",
-			metric: value{name: "Test1", isGauge: true, val: gauge(-45.8)},
-			want:   []byte(`{"id":"Test1","type":"gauge","value":-45.8}`),
-		},
-		{
-			name:   "Check counter",
-			metric: value{name: "Test2", isGauge: false, del: counter(8)},
-			want:   []byte(`{"id":"Test2","type":"counter","delta":8}`),
+			name:    "Check gauge",
+			metrics: map[string]interface{}{"M1": counter(345), "M2": gauge(63.689)},
+			want:    []byte(`[{"id":"M1","type":"counter","delta":345},{"id":"M2","type":"gauge","value":63.689}]`),
+			wantn:   []byte(`[{"id":"M2","type":"gauge","value":63.689},{"id":"M1","type":"counter","delta":345}]`),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.metric.isGauge {
-				got, err := metricToJSON(tt.metric.name, tt.metric.val)
-				require.NoError(t, err)
-				assert.True(t, reflect.DeepEqual(got, tt.want))
-			} else {
-				got, err := metricToJSON(tt.metric.name, tt.metric.del)
-				require.NoError(t, err)
-				assert.True(t, reflect.DeepEqual(got, tt.want))
-			}
+			got, err := metricsToJSON(tt.metrics, "")
+			require.NoError(t, err)
+			assert.True(
+				t,
+				reflect.DeepEqual(tt.want, got) || reflect.DeepEqual(tt.wantn, got),
+			)
 		})
 	}
 }

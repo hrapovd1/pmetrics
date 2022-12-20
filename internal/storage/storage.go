@@ -1,57 +1,79 @@
 package storage
 
 import (
+	"context"
+	"log"
 	"strconv"
+	"time"
 
+	"github.com/hrapovd1/pmetrics/internal/types"
 	"golang.org/x/exp/maps"
 )
 
-type gauge float64
-type counter int64
-
-type Repository interface {
-	Append(key string, value counter)
-	Get(key string) interface{}
-	GetAll() map[string]interface{}
-	Rewrite(key string, value gauge)
-}
-
 type MemStorage struct {
-	buffer  map[string]interface{}
-	backend *FileStorage
+	buffer map[string]interface{}
 }
 
 type Option func(mem *MemStorage) *MemStorage
 
-func (ms *MemStorage) Append(key string, value counter) {
-	_, ok := ms.buffer[key]
-	if !ok {
-		ms.buffer[key] = int64(value)
+func (ms *MemStorage) Append(ctx context.Context, key string, value int64) {
+	select {
+	case <-ctx.Done():
 		return
+	default:
+		var val int64
+		_, ok := ms.buffer[key]
+		if ok {
+			val = ms.buffer[key].(int64) + value
+		} else {
+			val = value
+		}
+		ms.buffer[key] = val
 	}
-	val := ms.buffer[key].(int64) + int64(value)
-	ms.buffer[key] = int64(val)
 }
 
-func (ms *MemStorage) Get(key string) interface{} {
-	val, ok := ms.buffer[key]
-	if ok {
-		switch val := val.(type) {
-		case float64:
-			return val
-		case int64:
+func (ms *MemStorage) Get(ctx context.Context, key string) interface{} {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		val, ok := ms.buffer[key]
+		if ok {
 			return val
 		}
+		return nil
 	}
-	return nil
 }
 
-func (ms *MemStorage) GetAll() map[string]interface{} {
+func (ms *MemStorage) GetAll(ctx context.Context) map[string]interface{} {
 	return maps.Clone(ms.buffer)
 }
 
-func (ms *MemStorage) Rewrite(key string, value gauge) {
-	ms.buffer[key] = float64(value)
+func (ms *MemStorage) Rewrite(ctx context.Context, key string, value float64) {
+	ms.buffer[key] = value
+}
+
+func (ms *MemStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		for _, m := range *metrics {
+			switch m.MType {
+			case "counter":
+				var val int64
+				_, ok := ms.buffer[m.ID]
+				if ok {
+					val = ms.buffer[m.ID].(int64) + *m.Delta
+				} else {
+					val = *m.Delta
+				}
+				ms.buffer[m.ID] = val
+			case "gauge":
+				ms.buffer[m.ID] = *m.Value
+			}
+		}
+	}
 }
 
 func NewMemStorage(opts ...Option) *MemStorage {
@@ -74,28 +96,24 @@ func WithBuffer(buffer map[string]interface{}) Option {
 	}
 }
 
-func WithBackend(backend *FileStorage) Option {
-	return func(mem *MemStorage) *MemStorage {
-		mem.backend = backend
-		mem.backend.buff = mem.buffer
-		return mem
-	}
+func (ms *MemStorage) Ping(ctx context.Context) bool {
+	return false
 }
 
-func StrToGauge(input string) (gauge, error) {
+func StrToFloat64(input string) (float64, error) {
 	out, err := strconv.ParseFloat(input, 64)
-	return gauge(out), err
+	return out, err
 }
 
-func StrToCounter(input string) (counter, error) {
+func StrToInt64(input string) (int64, error) {
 	out, err := strconv.ParseInt(input, 10, 64)
-	return counter(out), err
+	return out, err
 }
 
-func ToGauge(input float64) gauge {
-	return gauge(input)
-}
+func Close() error { return nil }
 
-func ToCounter(input int64) counter {
-	return counter(input)
-}
+func Ping(ctx context.Context) bool { return false }
+
+func Restore(ctx context.Context) error { return nil }
+
+func Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {}

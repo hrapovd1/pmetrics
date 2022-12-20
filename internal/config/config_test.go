@@ -18,25 +18,28 @@ func TestConfig_NewAgent(t *testing.T) {
 			fields: Config{
 				PollInterval:   2 * time.Second,
 				ReportInterval: 10 * time.Second,
-				RetryCount:     3,
 				ServerAddress:  "localhost:8080",
 				StoreInterval:  0,
 				StoreFile:      "",
 				IsRestore:      false,
+				DatabaseDSN:    "",
+				Key:            "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"KEY":             true,
 					"POLL_INTERVAL":   true,
 					"REPORT_INTERVAL": true,
 					"RESTORE":         true,
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewAgent(Flags{})
+			cfg, err := NewAgentConf(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})
@@ -56,20 +59,24 @@ func TestConfig_NewServer(t *testing.T) {
 				StoreInterval:  300 * time.Second,
 				StoreFile:      "/tmp/devops-metrics-db.json",
 				IsRestore:      false,
+				Key:            "",
+				DatabaseDSN:    "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"KEY":             true,
 					"POLL_INTERVAL":   true,
 					"REPORT_INTERVAL": true,
 					"RESTORE":         true,
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewServer(Flags{})
+			cfg, err := NewServerConf(Flags{})
 			require.NoError(t, err)
 			assert.Equal(t, tt.fields, *cfg)
 		})
