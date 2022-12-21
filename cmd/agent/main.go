@@ -95,12 +95,12 @@ func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration
 		case <-ctx.Done():
 			return
 		case <-pollTick.C:
+			var rtm runtime.MemStats
+			runtime.ReadMemStats(&rtm)
 			metrics.mu.Lock()
 
 			metrics.pollCounter++
 			metrics.mtrcs["PollCount"] = metrics.pollCounter
-			var rtm runtime.MemStats
-			runtime.ReadMemStats(&rtm)
 			metrics.mtrcs["Alloc"] = gauge(rtm.Alloc)
 			metrics.mtrcs["TotalAlloc"] = gauge(rtm.TotalAlloc)
 			metrics.mtrcs["Sys"] = gauge(rtm.Sys)

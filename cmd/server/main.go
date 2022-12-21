@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 
 	"github.com/go-chi/chi/v5"
 
@@ -20,12 +21,14 @@ func main() {
 	if err != nil {
 		logger.Fatalln(err)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	server := http.Server{Addr: serverConf.ServerAddress, ErrorLog: logger}
 
 	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
 	handlerStorage := handlerMetrics.Storage.(types.Storager)
 	defer handlerStorage.Close()
 
-	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval, serverConf.IsRestore)
+	go handlerStorage.Storing(ctx, logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
 	router.Use(handlers.GzipMiddle)
@@ -44,5 +47,25 @@ func main() {
 	router.Mount("/update", update)
 
 	logger.Println("Server start on ", serverConf.ServerAddress)
-	logger.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
+
+	server.Handler = router
+
+	go func() {
+		defer cancel()
+		sigint := make(chan os.Signal, 1)
+		defer close(sigint)
+
+		signal.Notify(sigint, os.Interrupt)
+		<-sigint
+
+		if err := server.Shutdown(ctx); err != nil {
+			// Error from closing listeners, or context timeout:
+			logger.Printf("HTTP server Shutdown: %v", err)
+		}
+	}()
+
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		// Error starting or closing listener:
+		logger.Printf("HTTP server ListenAndServe: %v", err)
+	}
 }
