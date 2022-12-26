@@ -1,22 +1,48 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func Test_pollHwMetrics(t *testing.T) {
+	testMetrics := make(map[string]interface{})
+	test := struct {
+		name string
+		args mmetrics
+		want []string
+	}{
+		name: "Check metric names",
+		args: mmetrics{pollCounter: counter(0), mtrcs: testMetrics},
+		want: []string{},
+	}
+	t.Run(test.name, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
+		defer cancel()
+		pollHwMetrics(ctx, &test.args, time.Microsecond*500, log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime))
+		for _, val := range test.want {
+			_, ok := test.args.mtrcs[val]
+			assert.True(t, ok)
+		}
+	})
+}
+
 func Test_pollMetrics(t *testing.T) {
 	testMetrics := make(map[string]interface{})
 	test := struct {
 		name string
-		args map[string]interface{}
+		args mmetrics
 		want []string
 	}{
 		name: "Check metric names",
-		args: testMetrics,
+		args: mmetrics{pollCounter: counter(0), mtrcs: testMetrics},
 		want: []string{
 			"Alloc",
 			"TotalAlloc",
@@ -49,9 +75,11 @@ func Test_pollMetrics(t *testing.T) {
 		},
 	}
 	t.Run(test.name, func(t *testing.T) {
-		pollMetrics(test.args)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
+		defer cancel()
+		pollMetrics(ctx, &test.args, time.Microsecond*500)
 		for _, val := range test.want {
-			_, ok := test.args[val]
+			_, ok := test.args.mtrcs[val]
 			assert.True(t, ok)
 		}
 	})
