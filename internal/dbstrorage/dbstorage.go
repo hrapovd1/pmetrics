@@ -13,9 +13,10 @@ import (
 )
 
 type DBStorage struct {
-	dbConnect *sql.DB
-	logger    *log.Logger
-	backStor  types.Repository
+	dbConnect  *sql.DB
+	logger     *log.Logger
+	backStor   types.Repository
+	tableNames map[string]struct{}
 }
 
 func (ds *DBStorage) Append(ctx context.Context, key string, value int64) {
@@ -83,8 +84,9 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 
 func NewDBStorage(dsn string, logger *log.Logger, backStor types.Repository) (*DBStorage, error) {
 	db := DBStorage{
-		logger:   logger,
-		backStor: backStor,
+		logger:     logger,
+		backStor:   backStor,
+		tableNames: make(map[string]struct{}),
 	}
 	dbConnect, err := sql.Open("pgx", dsn)
 	db.dbConnect = dbConnect
@@ -101,10 +103,13 @@ func (ds *DBStorage) store(ctx context.Context, metric *types.MetricModel) error
 	case <-ctx.Done():
 		return nil
 	default:
-		if !db.Migrator().HasTable(tableName) {
-			if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
-				return err
+		if _, ok := ds.tableNames[tableName]; !ok {
+			if !db.Migrator().HasTable(tableName) {
+				if err := db.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+					return err
+				}
 			}
+			ds.tableNames[tableName] = struct{}{}
 		}
 		db.Table(tableName).Create(metric)
 		return nil
@@ -124,10 +129,13 @@ func (ds *DBStorage) storeBatch(ctx context.Context, metrics *[]types.MetricMode
 		if err := db.Transaction(func(tx *gorm.DB) error {
 			for _, metric := range *metrics {
 				tableName := strings.ToLower(types.DBtablePrefix + metric.ID)
-				if !tx.Migrator().HasTable(tableName) {
-					if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
-						return err
+				if _, ok := ds.tableNames[tableName]; !ok {
+					if !db.Migrator().HasTable(tableName) {
+						if err := tx.Table(tableName).Migrator().CreateTable(&types.MetricModel{}); err != nil {
+							return err
+						}
 					}
+					ds.tableNames[tableName] = struct{}{}
 				}
 				tx.Table(tableName).Create(&metric)
 			}
