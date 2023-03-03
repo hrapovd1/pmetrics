@@ -19,26 +19,6 @@ type FileStorage struct {
 	ms     *storage.MemStorage
 }
 
-func (fs *FileStorage) Append(ctx context.Context, key string, value int64) {
-	fs.ms.Append(ctx, key, value)
-}
-
-func (fs *FileStorage) Get(ctx context.Context, key string) interface{} {
-	return fs.ms.Get(ctx, key)
-}
-
-func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
-	return fs.ms.GetAll(ctx)
-}
-
-func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
-	fs.ms.Rewrite(ctx, key, value)
-}
-
-func (fs *FileStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
-	fs.ms.StoreAll(ctx, metrics)
-}
-
 func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
 	fs := &FileStorage{
 		ms: storage.NewMemStorage(
@@ -58,6 +38,26 @@ func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorag
 	fs.writer = bufio.NewWriter(fs.file)
 
 	return fs
+}
+
+func (fs *FileStorage) Append(ctx context.Context, key string, value int64) {
+	fs.ms.Append(ctx, key, value)
+}
+
+func (fs *FileStorage) Get(ctx context.Context, key string) interface{} {
+	return fs.ms.Get(ctx, key)
+}
+
+func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
+	return fs.ms.GetAll(ctx)
+}
+
+func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
+	fs.ms.Rewrite(ctx, key, value)
+}
+
+func (fs *FileStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
+	fs.ms.StoreAll(ctx, metrics)
 }
 
 func (fs *FileStorage) Close() error {

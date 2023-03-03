@@ -21,17 +21,6 @@ type environ struct {
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 }
 
-type Flags struct {
-	address        string
-	pollInterval   string
-	reportInterval string
-	restore        bool
-	storeFile      string
-	storeInterval  string
-	key            string
-	dbDSN          string
-}
-
 type Config struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
@@ -43,32 +32,6 @@ type Config struct {
 	Key            string
 	DatabaseDSN    string
 	tagsDefault    map[string]bool
-}
-
-func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
-	cfg.tagsDefault[tag] = isDefault
-}
-
-func GetServerFlags() Flags {
-	flags := Flags{}
-	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
-	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
-	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
-	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
-	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
-	flag.Parse()
-	return flags
-}
-
-func GetAgentFlags() Flags {
-	flags := Flags{}
-	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
-	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
-	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
-	flag.Parse()
-	return flags
 }
 
 func NewAgentConf(flags Flags) (*Config, error) {
@@ -169,6 +132,43 @@ func NewServerConf(flags Flags) (*Config, error) {
 	}
 
 	return &cfg, err
+}
+
+func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
+	cfg.tagsDefault[tag] = isDefault
+}
+
+type Flags struct {
+	address        string
+	pollInterval   string
+	reportInterval string
+	restore        bool
+	storeFile      string
+	storeInterval  string
+	key            string
+	dbDSN          string
+}
+
+func GetServerFlags() Flags {
+	flags := Flags{}
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
+	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
+	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
+	flag.Parse()
+	return flags
+}
+
+func GetAgentFlags() Flags {
+	flags := Flags{}
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
+	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.Parse()
+	return flags
 }
 
 func parseInterval(interval string) (time.Duration, error) {

@@ -19,6 +19,17 @@ type DBStorage struct {
 	tableNames map[string]struct{}
 }
 
+func NewDBStorage(dsn string, logger *log.Logger, backStor types.Repository) (*DBStorage, error) {
+	db := DBStorage{
+		logger:     logger,
+		backStor:   backStor,
+		tableNames: make(map[string]struct{}),
+	}
+	dbConnect, err := sql.Open("pgx", dsn)
+	db.dbConnect = dbConnect
+	return &db, err
+}
+
 func (ds *DBStorage) Append(ctx context.Context, key string, value int64) {
 	ds.backStor.Append(ctx, key, value)
 	metric := types.MetricModel{
@@ -82,15 +93,32 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 	}
 }
 
-func NewDBStorage(dsn string, logger *log.Logger, backStor types.Repository) (*DBStorage, error) {
-	db := DBStorage{
-		logger:     logger,
-		backStor:   backStor,
-		tableNames: make(map[string]struct{}),
+func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
+	stor := ds.backStor.(types.Storager)
+	stor.Storing(ctx, logger, interval, restore)
+}
+
+func (ds *DBStorage) Close() error {
+	stor := ds.backStor.(types.Storager)
+	defer stor.Close()
+	return ds.dbConnect.Close()
+}
+
+func (ds *DBStorage) Ping(ctx context.Context) bool {
+	if ds.dbConnect == nil {
+		return false
 	}
-	dbConnect, err := sql.Open("pgx", dsn)
-	db.dbConnect = dbConnect
-	return &db, err
+	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	if err := ds.dbConnect.PingContext(ctxT); err != nil {
+		return false
+	}
+	return true
+}
+
+func (ds *DBStorage) Restore(ctx context.Context) error {
+	stor := ds.backStor.(types.Storager)
+	return stor.Restore(ctx)
 }
 
 func (ds *DBStorage) store(ctx context.Context, metric *types.MetricModel) error {
@@ -146,32 +174,4 @@ func (ds *DBStorage) storeBatch(ctx context.Context, metrics *[]types.MetricMode
 		}
 		return nil
 	}
-}
-
-func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
-	stor := ds.backStor.(types.Storager)
-	stor.Storing(ctx, logger, interval, restore)
-}
-
-func (ds *DBStorage) Close() error {
-	stor := ds.backStor.(types.Storager)
-	defer stor.Close()
-	return ds.dbConnect.Close()
-}
-
-func (ds *DBStorage) Ping(ctx context.Context) bool {
-	if ds.dbConnect == nil {
-		return false
-	}
-	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-	if err := ds.dbConnect.PingContext(ctxT); err != nil {
-		return false
-	}
-	return true
-}
-
-func (ds *DBStorage) Restore(ctx context.Context) error {
-	stor := ds.backStor.(types.Storager)
-	return stor.Restore(ctx)
 }

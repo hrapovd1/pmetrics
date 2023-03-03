@@ -10,11 +10,24 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+type Option func(mem *MemStorage) *MemStorage
+
 type MemStorage struct {
 	buffer map[string]interface{}
 }
 
-type Option func(mem *MemStorage) *MemStorage
+func NewMemStorage(opts ...Option) *MemStorage {
+	buffer := make(map[string]interface{})
+	ms := &MemStorage{
+		buffer: buffer,
+	}
+
+	for _, opt := range opts {
+		ms = opt(ms)
+	}
+
+	return ms
+}
 
 func (ms *MemStorage) Append(ctx context.Context, key string, value int64) {
 	select {
@@ -76,17 +89,13 @@ func (ms *MemStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 	}
 }
 
-func NewMemStorage(opts ...Option) *MemStorage {
-	buffer := make(map[string]interface{})
-	ms := &MemStorage{
-		buffer: buffer,
-	}
+func (ms *MemStorage) Close() error { return nil }
 
-	for _, opt := range opts {
-		ms = opt(ms)
-	}
+func (ms *MemStorage) Ping(ctx context.Context) bool { return false }
 
-	return ms
+func (ms *MemStorage) Restore(ctx context.Context) error { return nil }
+
+func (ms *MemStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
 }
 
 func WithBuffer(buffer map[string]interface{}) Option {
@@ -94,10 +103,6 @@ func WithBuffer(buffer map[string]interface{}) Option {
 		mem.buffer = buffer
 		return mem
 	}
-}
-
-func (ms *MemStorage) Ping(ctx context.Context) bool {
-	return false
 }
 
 func StrToFloat64(input string) (float64, error) {
@@ -109,11 +114,3 @@ func StrToInt64(input string) (int64, error) {
 	out, err := strconv.ParseInt(input, 10, 64)
 	return out, err
 }
-
-func Close() error { return nil }
-
-func Ping(ctx context.Context) bool { return false }
-
-func Restore(ctx context.Context) error { return nil }
-
-func Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {}
