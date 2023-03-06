@@ -7,9 +7,11 @@ require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/go-cmp v0.5.9
-	github.com/jackc/pgx/v5 v5.1.1
+	github.com/shirou/gopsutil/v3 v3.22.11
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326
+	gorm.io/driver/postgres v1.4.5
+	gorm.io/gorm v1.24.2
 )
 
 require (
@@ -25,21 +27,17 @@ require (
 	github.com/jackc/pgx/v4 v4.17.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/kr/text v0.2.0 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/rogpeppe/go-internal v1.6.1 // indirect
-	github.com/shirou/gopsutil/v3 v3.22.11 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
 	golang.org/x/net v0.2.0 // indirect
-	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.4.5 // indirect
-	gorm.io/gorm v1.24.2 // indirect
 )
