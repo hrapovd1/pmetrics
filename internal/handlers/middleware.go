@@ -1,3 +1,5 @@
+// Часть модуля handlers содержит типы и методы middleware,
+// реализующий сжатие при передаче по http.
 package handlers
 
 import (
@@ -7,16 +9,19 @@ import (
 	"strings"
 )
 
+// тип http ответа со сжатием
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
 
+// Write реализует интерфейс Writer
 func (w gzipWriter) Write(b []byte) (int, error) {
 	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
 	return w.Writer.Write(b)
 }
 
+// GzipMiddle промежуточный обработчик запросов для сжатия/распаковки
 func GzipMiddle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// проверяем, что клиент поддерживает gzip-сжатие

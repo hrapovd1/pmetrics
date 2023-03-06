@@ -1,3 +1,4 @@
+// Модуль usecase содержит общие для проекта методы.
 package usecase
 
 import (
@@ -10,13 +11,15 @@ import (
 )
 
 const (
-	metricType    = 2
-	metricName    = 3
-	metricVal     = 4
-	getMetricType = 2
-	getMetricName = 3
+	metricType    = 2 // Позиция типа метрики в url POST запроса
+	metricName    = 3 // Позиция имени метрики в url POST запроса
+	metricVal     = 4 // Позиция значения метркики в url POST запроса
+	getMetricType = 2 // Позиция значения метрики в url GET запроса
+	getMetricName = 3 // Позиция имени метрики в url GET запроса
 )
 
+// WriteMetric сохраняет метрику в Repository при получении через
+// url POST запроса.
 func WriteMetric(ctx context.Context, path []string, repo types.Repository) error {
 	metricKey := path[metricName]
 	switch path[metricType] {
@@ -37,6 +40,8 @@ func WriteMetric(ctx context.Context, path []string, repo types.Repository) erro
 	}
 }
 
+// GetMetric возвращает значение метрики из Repository при запросе
+// через url GET запросом.
 func GetMetric(ctx context.Context, repo types.Repository, path []string) (string, error) {
 	metricType := path[getMetricType]
 	metric := path[getMetricName]
@@ -59,6 +64,8 @@ func GetMetric(ctx context.Context, repo types.Repository, path []string) (strin
 	return metricValue, err
 }
 
+// WriteJSONMetric сохраняет метрику в Repository полученную в
+// JSON формате POST запроса.
 func WriteJSONMetric(ctx context.Context, data types.Metric, repo types.Repository) error {
 	switch data.MType {
 	case "gauge":
@@ -72,10 +79,14 @@ func WriteJSONMetric(ctx context.Context, data types.Metric, repo types.Reposito
 	}
 }
 
+// WriteJSONMetrics сохраняет метрики полученные в JSON формате
+// POST запроса в Repository.
 func WriteJSONMetrics(ctx context.Context, data *[]types.Metric, repo types.Repository) {
 	repo.StoreAll(ctx, data)
 }
 
+// GetJSONMetric возвращает метрику из Repository в JSON формате
+// при GET запросе
 func GetJSONMetric(ctx context.Context, repo types.Repository, data *types.Metric) error {
 	var err error
 
@@ -102,6 +113,8 @@ func GetJSONMetric(ctx context.Context, repo types.Repository, data *types.Metri
 	return err
 }
 
+// GetTableMetrics возвращает все метрики в строчном виде для
+// последующего отображения на html странице.
 func GetTableMetrics(ctx context.Context, repo types.Repository) map[string]string {
 	outTable := make(map[string]string)
 

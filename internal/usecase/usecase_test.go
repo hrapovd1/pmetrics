@@ -217,3 +217,76 @@ func TestGetTableMetrics(t *testing.T) {
 		assert.True(t, cmp.Equal(test.want, result))
 	})
 }
+
+func TestSignData(t *testing.T) {
+	const key = "wersdjfl23.w3"
+	counter := int64(34567)
+	gauge := float64(8723.098)
+	tests := []struct {
+		name string
+		data types.Metric
+		want string
+	}{
+		{
+			name: "counter value",
+			data: types.Metric{ID: "test1", MType: "counter", Delta: &counter},
+			want: "4003975ccfa11fdd45fc8ad03202a1f1dab466c3d118b2c7200e45de6f90da37",
+		},
+		{
+			name: "gauge value",
+			data: types.Metric{ID: "test2", MType: "gauge", Value: &gauge},
+			want: "de0a02dd05ed708397ab730155bdf233ef415eebe8778c921b1aeff8333570e6",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, SignData(&test.data, key))
+			assert.Equal(t, test.want, test.data.Hash)
+		})
+	}
+}
+
+func TestIsSignEqual(t *testing.T) {
+	const key = "wersdjfl23.w3"
+	value := int64(34567)
+	tests := []struct {
+		isPositive bool
+		data       types.Metric
+		want       bool
+	}{
+		{
+			isPositive: true,
+			data: types.Metric{
+				ID:    "test",
+				MType: "counter",
+				Delta: &value,
+				Hash:  "bf9f25fcb26f7df011969f39a83d81c7746a07ea400bf93e4758fd565fce32f8",
+			},
+			want: true,
+		},
+		{
+			isPositive: false,
+			data: types.Metric{
+				ID:    "test",
+				MType: "counter",
+				Delta: &value,
+				Hash:  "af9f25fcb26f7df011969f39a83d81c7746a07ea400bf93e4758fd565fce32f8",
+			},
+			want: true,
+		},
+	}
+	for _, test := range tests {
+		if test.isPositive {
+			t.Run("positive", func(t *testing.T) {
+				assert.True(t, IsSignEqual(test.data, key))
+			})
+		} else {
+			t.Run("negative", func(t *testing.T) {
+				assert.False(t, IsSignEqual(test.data, key))
+			})
+
+		}
+
+	}
+
+}

@@ -1,3 +1,5 @@
+// Модуль handlers содержит типы, методы и константы для
+// API handlers
 package handlers
 
 import (
@@ -20,15 +22,20 @@ import (
 )
 
 const (
+	// минимально ожидаемая длина url метрики для POST
 	minPathLen = 5
+	// минимально ожидаемая длина url метрики для GET
 	getPathLen = 4
 )
 
+// MetricsHandler тип обработчиков API
+// содержит конфигурацию и хранилище
 type MetricsHandler struct {
 	Storage types.Repository
 	Config  config.Config
 }
 
+// NewMetricsHandler возвращает обработчик API
 func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 	mh := &MetricsHandler{Config: conf}
 	var fs *filestorage.FileStorage
@@ -69,6 +76,7 @@ func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 	return mh
 }
 
+// UpdateHandler POST обработчик обновления одной метрики в JSON формате
 func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -134,6 +142,7 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 	}
 }
 
+// UpdatesHandler POST обработчик обновления нескольких метрик в JSON формате
 func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -176,6 +185,7 @@ func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request
 
 }
 
+// GetMetricJSONHandler GET обработчик чтения одной метрики в JSON формате
 func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -222,6 +232,7 @@ func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.R
 	}
 }
 
+// GaugeHandler POST обработчик обновления gauge метрики в url формате
 func (mh *MetricsHandler) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -260,6 +271,7 @@ func (mh *MetricsHandler) GaugeHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// CounterHandler POST обработчик обновления counter метрики в url формате
 func (mh *MetricsHandler) CounterHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -298,6 +310,7 @@ func (mh *MetricsHandler) CounterHandler(rw http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetMetricHandler GET обработчик получения метрики в url формате
 func (mh *MetricsHandler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -332,6 +345,7 @@ func (mh *MetricsHandler) GetMetricHandler(rw http.ResponseWriter, r *http.Reque
 	}
 }
 
+// GetAllHandler GET обработчик получения всех метрик в HTML формате
 func (mh *MetricsHandler) GetAllHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -357,6 +371,7 @@ func (mh *MetricsHandler) GetAllHandler(rw http.ResponseWriter, r *http.Request)
 	}
 }
 
+// PingDB GET обработчик проверки доступности базы
 func (mh *MetricsHandler) PingDB(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -369,6 +384,7 @@ func (mh *MetricsHandler) PingDB(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+// NotImplementedHandler обработчик для ответа на не реализованные url
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusNotImplemented)
 	_, err := rw.Write([]byte("It's not implemented yet."))

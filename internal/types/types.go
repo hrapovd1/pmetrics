@@ -1,3 +1,4 @@
+// Модуль types содержит общие для проетка типы и интерфейсы.
 package types
 
 import (
@@ -7,8 +8,10 @@ import (
 	"time"
 )
 
+// Префикс в названиях таблиц базы
 const DBtablePrefix = "pmetric_"
 
+// Metric тип JSON формата метрики
 type Metric struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
@@ -17,6 +20,7 @@ type Metric struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
+// Repository основной интерфейс хранилища метрик
 type Repository interface {
 	Append(ctx context.Context, key string, value int64)
 	Get(ctx context.Context, key string) interface{}
@@ -25,6 +29,7 @@ type Repository interface {
 	StoreAll(ctx context.Context, metrics *[]Metric)
 }
 
+// Storager вспомогательный интерфейс хранилища метрик
 type Storager interface {
 	Close() error
 	Ping(ctx context.Context) bool
@@ -32,6 +37,7 @@ type Storager interface {
 	Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool)
 }
 
+// MetricModel модель таблицы для хранения метрики в базе
 type MetricModel struct {
 	Timestamp int64 `gorm:"primaryKey;autoCreateTime"`
 	ID        string

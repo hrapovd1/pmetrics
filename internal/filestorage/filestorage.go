@@ -1,3 +1,5 @@
+// Модуль filestorage содержит типы и методы для
+// хранения метрик в файле, в формате JSON.
 package filestorage
 
 import (
@@ -13,12 +15,15 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
+// FileStorage - тип реализует types.Repository интерфейс для
+// хранения метрик в файле.
 type FileStorage struct {
 	file   *os.File
 	writer *bufio.Writer
 	ms     *storage.MemStorage
 }
 
+// NewFileStorage создает объект типа FileStorage
 func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorage {
 	fs := &FileStorage{
 		ms: storage.NewMemStorage(
@@ -40,34 +45,42 @@ func NewFileStorage(conf config.Config, buff map[string]interface{}) *FileStorag
 	return fs
 }
 
+// Append сохраняет новое значение типа counter с дозаписью к старому
 func (fs *FileStorage) Append(ctx context.Context, key string, value int64) {
 	fs.ms.Append(ctx, key, value)
 }
 
+// Get возвращает значение метрики переданной через key
 func (fs *FileStorage) Get(ctx context.Context, key string) interface{} {
 	return fs.ms.Get(ctx, key)
 }
 
+// GetAll возвращает все метрики
 func (fs *FileStorage) GetAll(ctx context.Context) map[string]interface{} {
 	return fs.ms.GetAll(ctx)
 }
 
+// Rewrite перезаписывает значение метрики типа gauge
 func (fs *FileStorage) Rewrite(ctx context.Context, key string, value float64) {
 	fs.ms.Rewrite(ctx, key, value)
 }
 
+// StoreAll сохраняет все полученные метрики через слайс metrics
 func (fs *FileStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 	fs.ms.StoreAll(ctx, metrics)
 }
 
+// Close закрывает открытый ранее файл, необходимо запускать в defer
 func (fs *FileStorage) Close() error {
 	return fs.file.Close()
 }
 
+// Ping для реализации интерфейса Storager
 func (fs *FileStorage) Ping(ctx context.Context) bool {
 	return false
 }
 
+// Restore восстанавливае значение метрик при запуске из файла
 func (fs *FileStorage) Restore(ctx context.Context) error {
 	var err error
 	var data []byte
@@ -86,6 +99,7 @@ func (fs *FileStorage) Restore(ctx context.Context) error {
 	}
 }
 
+// Store сбрасывает значения метрик из памяти в файл в JSON формате
 func (fs *FileStorage) Store(ctx context.Context) error {
 	metrics := make([]types.Metric, 0)
 	select {
@@ -119,6 +133,7 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 	}
 }
 
+// Storing запускается в отдельной go routine для сохранения метрик в файл
 func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
 	defer fs.Close()
 	if restore {

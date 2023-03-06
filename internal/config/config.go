@@ -1,3 +1,5 @@
+// Модуль config определяет типы и методы для формирования
+// конфигурации приложения через флаги и переменные среды.
 package config
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+// environ содержит значения переменных среды
 type environ struct {
 	PollInterval   string `env:"POLL_INTERVAL" envDefault:"2s"`
 	ReportInterval string `env:"REPORT_INTERVAL" envDefault:"10s"`
@@ -21,6 +24,7 @@ type environ struct {
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 }
 
+// Config тип итоговой конфигурации агента или сервера
 type Config struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
@@ -34,6 +38,7 @@ type Config struct {
 	tagsDefault    map[string]bool
 }
 
+// NewAgentConf генерирует рабочую конфигурацию агента
 func NewAgentConf(flags Flags) (*Config, error) {
 	var cfg Config
 	cfg.tagsDefault = make(map[string]bool)
@@ -77,6 +82,7 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	return &cfg, err
 }
 
+// NewServerConf генерирует рабочую конфигурацию сервера
 func NewServerConf(flags Flags) (*Config, error) {
 	var err error
 	var cfg Config
@@ -134,10 +140,12 @@ func NewServerConf(flags Flags) (*Config, error) {
 	return &cfg, err
 }
 
+// getTags проверка и отметка значений переменных среды что они по умолчанию или нет
 func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
 	cfg.tagsDefault[tag] = isDefault
 }
 
+// Flags содержит значения флагов переданные при запуске
 type Flags struct {
 	address        string
 	pollInterval   string
@@ -149,6 +157,7 @@ type Flags struct {
 	dbDSN          string
 }
 
+// GetServerFlags - считывае флаги сервера
 func GetServerFlags() Flags {
 	flags := Flags{}
 	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
@@ -161,6 +170,7 @@ func GetServerFlags() Flags {
 	return flags
 }
 
+// GetAgentFlags - считывает флаги агента
 func GetAgentFlags() Flags {
 	flags := Flags{}
 	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
@@ -171,6 +181,7 @@ func GetAgentFlags() Flags {
 	return flags
 }
 
+// parseInterval преобразует строку интервала в time.Durations
 func parseInterval(interval string) (time.Duration, error) {
 	value := make([]string, 0)
 	for _, ch := range interval {
