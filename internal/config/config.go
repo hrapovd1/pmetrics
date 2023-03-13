@@ -1,3 +1,5 @@
+// Модуль config определяет типы и методы для формирования
+// конфигурации приложения через флаги и переменные среды.
 package config
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+// environ содержит значения переменных среды
 type environ struct {
 	PollInterval   string `env:"POLL_INTERVAL" envDefault:"2s"`
 	ReportInterval string `env:"REPORT_INTERVAL" envDefault:"10s"`
@@ -21,17 +24,7 @@ type environ struct {
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 }
 
-type Flags struct {
-	address        string
-	pollInterval   string
-	reportInterval string
-	restore        bool
-	storeFile      string
-	storeInterval  string
-	key            string
-	dbDSN          string
-}
-
+// Config тип итоговой конфигурации агента или сервера
 type Config struct {
 	PollInterval   time.Duration
 	ReportInterval time.Duration
@@ -45,32 +38,7 @@ type Config struct {
 	tagsDefault    map[string]bool
 }
 
-func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
-	cfg.tagsDefault[tag] = isDefault
-}
-
-func GetServerFlags() Flags {
-	flags := Flags{}
-	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
-	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
-	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
-	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
-	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
-	flag.Parse()
-	return flags
-}
-
-func GetAgentFlags() Flags {
-	flags := Flags{}
-	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
-	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
-	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
-	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
-	flag.Parse()
-	return flags
-}
-
+// NewAgentConf генерирует рабочую конфигурацию агента
 func NewAgentConf(flags Flags) (*Config, error) {
 	var cfg Config
 	cfg.tagsDefault = make(map[string]bool)
@@ -114,6 +82,7 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	return &cfg, err
 }
 
+// NewServerConf генерирует рабочую конфигурацию сервера
 func NewServerConf(flags Flags) (*Config, error) {
 	var err error
 	var cfg Config
@@ -171,6 +140,48 @@ func NewServerConf(flags Flags) (*Config, error) {
 	return &cfg, err
 }
 
+// getTags проверка и отметка значений переменных среды что они по умолчанию или нет
+func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
+	cfg.tagsDefault[tag] = isDefault
+}
+
+// Flags содержит значения флагов переданные при запуске
+type Flags struct {
+	address        string
+	pollInterval   string
+	reportInterval string
+	restore        bool
+	storeFile      string
+	storeInterval  string
+	key            string
+	dbDSN          string
+}
+
+// GetServerFlags - считывае флаги сервера
+func GetServerFlags() Flags {
+	flags := Flags{}
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.BoolVar(&flags.restore, "r", true, "Restore last data from file, true/false")
+	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
+	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
+	flag.Parse()
+	return flags
+}
+
+// GetAgentFlags - считывает флаги агента
+func GetAgentFlags() Flags {
+	flags := Flags{}
+	flag.StringVar(&flags.address, "a", "", "Address of server, for example: 0.0.0.0:8000")
+	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
+	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
+	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.Parse()
+	return flags
+}
+
+// parseInterval преобразует строку интервала в time.Durations
 func parseInterval(interval string) (time.Duration, error) {
 	value := make([]string, 0)
 	for _, ch := range interval {

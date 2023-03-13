@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -128,4 +129,20 @@ func Test_parseInterval(t *testing.T) {
 			assert.Equal(t, tt.want, val)
 		})
 	}
+}
+
+func ExampleGetAgentFlags() {
+	agentFlags := GetAgentFlags()
+
+	agentConfig, _ := NewAgentConf(agentFlags)
+
+	fmt.Println(agentConfig)
+}
+
+func ExampleGetServerFlags() {
+	serverFlags := GetServerFlags()
+
+	serverConfig, _ := NewServerConf(serverFlags)
+
+	fmt.Println(serverConfig)
 }

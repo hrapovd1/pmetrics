@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/handlers"
@@ -42,6 +43,7 @@ func main() {
 	update.Post("/*", handlers.NotImplementedHandler)
 
 	router.Mount("/update", update)
+	router.Mount("/debug", middleware.Profiler())
 
 	logger.Println("Server start on ", serverConf.ServerAddress)
 	logger.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))

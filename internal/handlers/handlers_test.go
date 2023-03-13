@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -310,4 +313,21 @@ func TestNotImplementedHandler(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
 	})
+}
+
+func Example() {
+	// Создаем конфигурацию хранилища метрик
+	config := config.Config{
+		StoreFile:   "", // Указываем без файла
+		DatabaseDSN: "", // и без БД
+	}
+
+	logger := log.New(os.Stdout, "Example\t", log.Ldate|log.Ltime)
+
+	handler := NewMetricsHandler(config, logger)
+
+	http.HandleFunc("/", handler.GetAllHandler)
+
+	logger.Fatal(http.ListenAndServe("localhost:8000", nil))
+
 }
