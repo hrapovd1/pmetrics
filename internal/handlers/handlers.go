@@ -33,11 +33,12 @@ const (
 type MetricsHandler struct {
 	Storage types.Repository
 	Config  config.Config
+	logger  *log.Logger
 }
 
 // NewMetricsHandler возвращает обработчик API
 func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
-	mh := &MetricsHandler{Config: conf}
+	mh := &MetricsHandler{Config: conf, logger: logger}
 	var fs *filestorage.FileStorage
 	// Have mem, fs and db storage
 	if mh.Config.StoreFile != "" && mh.Config.DatabaseDSN != "" {
@@ -80,7 +81,7 @@ func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer r.Body.Close()
+	defer mh.logger.Println(r.Body.Close())
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -146,7 +147,7 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer r.Body.Close()
+	defer mh.logger.Println(r.Body.Close())
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -189,7 +190,7 @@ func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request
 func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer r.Body.Close()
+	defer mh.logger.Println(r.Body.Close())
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)

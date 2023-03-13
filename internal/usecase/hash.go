@@ -12,22 +12,23 @@ import (
 // Write sign data with hash function here
 func SignData(data *types.Metric, key string) error {
 	h := hmac.New(sha256.New, []byte(key))
-	if data.MType == "counter" {
+	switch data.MType {
+	case "counter":
 		_, err := h.Write([]byte(fmt.Sprintf("%s:%s:%d", data.ID, data.MType, *data.Delta)))
 		if err != nil {
 			return err
 		}
 		data.Hash = fmt.Sprintf("%x", h.Sum(nil))
-		return nil
-	} else if data.MType == "gauge" {
+	case "gauge":
 		_, err := h.Write([]byte(fmt.Sprintf("%s:%s:%f", data.ID, data.MType, *data.Value)))
 		if err != nil {
 			return err
 		}
 		data.Hash = fmt.Sprintf("%x", h.Sum(nil))
-		return nil
+	default:
+		return errors.New("undefined data.MType")
 	}
-	return errors.New("undefined data.MType")
+	return nil
 }
 
 // Write check sign data hash function here

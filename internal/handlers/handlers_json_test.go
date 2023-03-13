@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -41,6 +43,7 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 
 	ms := MetricsHandler{
 		Storage: storage.NewMemStorage(),
+		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
 	}
 
 	for _, test := range tests {
@@ -53,7 +56,7 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			body, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
@@ -72,6 +75,7 @@ func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 	stor["Sys"] = float64(0.0)
 	ms := MetricsHandler{
 		Storage: locStorage,
+		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
 	}
 
 	tests := []struct {
@@ -108,7 +112,7 @@ func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 			// qeury server
 			hndl.ServeHTTP(rec, reqst)
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			body, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 

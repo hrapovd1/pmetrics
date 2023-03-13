@@ -24,12 +24,12 @@ func main() {
 
 	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
 	handlerStorage := handlerMetrics.Storage.(types.Storager)
-	defer handlerStorage.Close()
+	defer logger.Println(handlerStorage.Close())
 
 	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
-	router.Use(handlers.GzipMiddle)
+	router.Use(handlerMetrics.GzipMiddle)
 	router.Get("/", handlerMetrics.GetAllHandler)
 	router.Get("/value/*", handlerMetrics.GetMetricHandler)
 	router.Get("/ping", handlerMetrics.PingDB)

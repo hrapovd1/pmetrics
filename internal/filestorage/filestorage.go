@@ -135,7 +135,7 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 
 // Storing запускается в отдельной go routine для сохранения метрик в файл
 func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
-	defer fs.Close()
+	defer logger.Println(fs.Close())
 	if restore {
 		if err := fs.Restore(ctx); err != nil {
 			logger.Println(err)

@@ -27,7 +27,7 @@ func TestFileStorage_Restore(t *testing.T) {
 		"M2": float64(3.9),
 	}
 	ctx := context.Background()
-	//data := `[{"id":"M1","type":"counter","delta":4},{"id":"M2","type":"gauge","value":3.9}]`
+	// data := `[{"id":"M1","type":"counter","delta":4},{"id":"M2","type":"gauge","value":3.9}]`
 	err := fs.Store(ctx)
 	require.NoError(t, err)
 	require.NoError(t, fs.writer.Flush())

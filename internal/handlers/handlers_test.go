@@ -82,7 +82,7 @@ func TestMetricsHandler_GaugeHandler(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
@@ -159,7 +159,7 @@ func TestMetricsHandler_CounterHandler(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			_, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
@@ -194,7 +194,7 @@ func TestMetricsHandler_GetAllHandler(t *testing.T) {
 	result := rec.Result()
 	body, err := io.ReadAll(result.Body)
 	assert.Nil(t, err)
-	defer result.Body.Close()
+	defer assert.Nil(t, result.Body.Close())
 	statusCode := result.StatusCode
 
 	t.Run("Status Code", func(t *testing.T) {
@@ -286,7 +286,7 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 			// qeury server
 			hndl.ServeHTTP(rec, reqst)
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			body, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 
@@ -308,7 +308,7 @@ func TestNotImplementedHandler(t *testing.T) {
 
 	t.Run("Check not implemented", func(t *testing.T) {
 		result := rec.Result()
-		defer result.Body.Close()
+		defer assert.Nil(t, result.Body.Close())
 		_, err := io.ReadAll(result.Body)
 		assert.Nil(t, err)
 		assert.Equal(t, http.StatusNotImplemented, result.StatusCode)
