@@ -300,6 +300,20 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 	}
 }
 
+func TestMetricsHandler_PingDB(t *testing.T) {
+	mh := MetricsHandler{
+		Storage: storage.NewMemStorage(),
+	}
+	reqst := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	hndl := http.HandlerFunc(mh.PingDB)
+	// qeury server
+	hndl.ServeHTTP(rec, reqst)
+	result := rec.Result()
+	defer result.Body.Close()
+	assert.Equal(t, http.StatusInternalServerError, result.StatusCode)
+}
+
 func TestNotImplementedHandler(t *testing.T) {
 	reqst := httptest.NewRequest(http.MethodPost, "/update/any/", nil)
 	rec := httptest.NewRecorder()
