@@ -111,7 +111,7 @@ func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval t
 // Close закрывает подключение к БД, необходимо запускать в defer
 func (ds *DBStorage) Close() error {
 	stor := ds.backStor.(types.Storager)
-	defer stor.Close()
+	defer ds.logger.Println(stor.Close())
 	return ds.dbConnect.Close()
 }
 

@@ -20,6 +20,12 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 type gauge float64
 type counter int64
 type mmetrics struct {
@@ -49,7 +55,20 @@ func main() {
 	defer close(sigint)
 	signal.Notify(sigint, os.Interrupt)
 
-	logger.Println("started")
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	logger.Println("Agent has started")
+	logger.Printf("\tBuild version: %s\n", buildVersion)
+	logger.Printf("\tBuild date: %s\n", buildDate)
+	logger.Printf("\tBuild commit: %s\n", buildCommit)
 	defer logger.Println("stopped")
 
 	go pollMetrics(ctx, &metrics, agentConf.PollInterval)

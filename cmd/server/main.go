@@ -14,6 +14,12 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/types"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
 	logger := log.New(os.Stdout, "SERVER\t", log.Ldate|log.Ltime)
 	// Чтение флагов и установка конфигурации сервера
@@ -22,14 +28,29 @@ func main() {
 		logger.Fatalln(err)
 	}
 
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	logger.Printf("\tBuild version: %s\n", buildVersion)
+	logger.Printf("\tBuild date: %s\n", buildDate)
+	logger.Printf("\tBuild commit: %s\n", buildCommit)
+	logger.Println("Server start on ", serverConf.ServerAddress)
+
 	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
 	handlerStorage := handlerMetrics.Storage.(types.Storager)
-	defer handlerStorage.Close()
+	defer logger.Println(handlerStorage.Close())
 
 	go handlerStorage.Storing(context.Background(), logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
-	router.Use(handlers.GzipMiddle)
+	router.Use(handlerMetrics.GzipMiddle)
 	router.Get("/", handlerMetrics.GetAllHandler)
 	router.Get("/value/*", handlerMetrics.GetMetricHandler)
 	router.Get("/ping", handlerMetrics.PingDB)
@@ -45,6 +66,5 @@ func main() {
 	router.Mount("/update", update)
 	router.Mount("/debug", middleware.Profiler())
 
-	logger.Println("Server start on ", serverConf.ServerAddress)
 	logger.Fatal(http.ListenAndServe(serverConf.ServerAddress, router))
 }

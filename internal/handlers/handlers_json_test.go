@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -41,6 +43,7 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 
 	ms := MetricsHandler{
 		Storage: storage.NewMemStorage(),
+		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
 	}
 
 	for _, test := range tests {
@@ -53,7 +56,7 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			body, err := io.ReadAll(result.Body)
 			assert.Nil(t, err)
 			if test.statusCode == http.StatusOK {
@@ -65,6 +68,56 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 	}
 }
 
+func TestMetricsHandler_UpdatesHandler(t *testing.T) {
+	tests := []struct {
+		name        string
+		data        string
+		contentType string
+		statusCode  int
+	}{
+		{
+			name:        "Alloc",
+			data:        `[{"id":"Alloc1","type":"gauge","value":-4.5}]`,
+			contentType: "application/json",
+			statusCode:  http.StatusOK,
+		},
+		{
+			name:        "Count1",
+			data:        `[{"id":"Count1","type":"counter","delta":5}]`,
+			contentType: "application/json",
+			statusCode:  http.StatusOK,
+		},
+		{
+			name:        "Empty data",
+			data:        `{}`,
+			contentType: "application/json",
+			statusCode:  http.StatusInternalServerError,
+		},
+	}
+
+	ms := MetricsHandler{
+		Storage: storage.NewMemStorage(),
+		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+	}
+
+	for _, test := range tests {
+		reqst := httptest.NewRequest(http.MethodPost, "/updates/", strings.NewReader(test.data))
+		reqst.Header.Set("Content-Type", test.contentType)
+		rec := httptest.NewRecorder()
+		hndl := http.HandlerFunc(ms.UpdatesHandler)
+		// qeury server
+		hndl.ServeHTTP(rec, reqst)
+
+		t.Run(test.name, func(t *testing.T) {
+			result := rec.Result()
+			defer assert.Nil(t, result.Body.Close())
+			_, err := io.ReadAll(result.Body)
+			assert.Nil(t, err)
+			assert.Equal(t, test.statusCode, result.StatusCode)
+		})
+	}
+}
+
 func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 	stor := make(map[string]interface{})
 	locStorage := storage.NewMemStorage(storage.WithBuffer(stor))
@@ -72,6 +125,7 @@ func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 	stor["Sys"] = float64(0.0)
 	ms := MetricsHandler{
 		Storage: locStorage,
+		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
 	}
 
 	tests := []struct {
@@ -108,7 +162,7 @@ func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 			// qeury server
 			hndl.ServeHTTP(rec, reqst)
 			result := rec.Result()
-			defer result.Body.Close()
+			defer assert.Nil(t, result.Body.Close())
 			body, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 

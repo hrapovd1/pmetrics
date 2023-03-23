@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,4 +145,133 @@ func TestMemStorage_GetAll(t *testing.T) {
 		out := ms.GetAll(ctx)
 		assert.True(t, cmp.Equal(stor, out))
 	})
+}
+
+func TestMemStorage_StoreAll(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		metrics *[]types.Metric
+	}
+	var m1 = int64(4567)
+	var m2 = float64(45.67)
+	metrics := []types.Metric{
+		{ID: "M1", MType: "counter", Delta: &m1},
+		{ID: "M2", MType: "gauge", Value: &m2},
+	}
+	buff := make(map[string]interface{})
+
+	tests := []struct {
+		name   string
+		args   args
+		result map[string]interface{}
+	}{
+		{
+			"first test",
+			args{
+				ctx:     context.Background(),
+				metrics: &metrics,
+			},
+			map[string]interface{}{"M1": int64(4567), "M2": float64(45.67)},
+		},
+		{
+			"second test",
+			args{
+				ctx:     context.Background(),
+				metrics: &metrics,
+			},
+			map[string]interface{}{"M1": int64(9134), "M2": float64(45.67)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := &MemStorage{
+				buffer: buff,
+			}
+			ms.StoreAll(tt.args.ctx, tt.args.metrics)
+			assert.Equal(t, tt.result, buff)
+		})
+	}
+}
+
+func TestStrToFloat64(t *testing.T) {
+	tests := []struct {
+		name   string
+		inVal  string
+		outVal float64
+	}{
+		{
+			"empty",
+			"",
+			float64(0),
+		},
+		{
+			"positive",
+			"3.1",
+			float64(3.1),
+		},
+		{
+			"negative",
+			"-2.0",
+			float64(-2),
+		},
+		{
+			"less zero",
+			"0.001",
+			float64(0.001),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := StrToFloat64(tt.inVal)
+			if tt.inVal != "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.outVal, res)
+			} else {
+				require.Error(t, err)
+			}
+
+		})
+	}
+}
+
+func TestStrToInt64(t *testing.T) {
+	tests := []struct {
+		name   string
+		inVal  string
+		outVal int64
+	}{
+		{
+			"empty",
+			"",
+			int64(0),
+		},
+		{
+			"positive",
+			"3",
+			int64(3),
+		},
+		{
+			"negative",
+			"-2",
+			int64(-2),
+		},
+		{
+			"zero",
+			"0",
+			int64(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := StrToInt64(tt.inVal)
+			if tt.inVal != "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.outVal, res)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 }

@@ -22,7 +22,7 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 }
 
 // GzipMiddle промежуточный обработчик запросов для сжатия/распаковки
-func GzipMiddle(next http.Handler) http.Handler {
+func (mh *MetricsHandler) GzipMiddle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// проверяем, что клиент поддерживает gzip-сжатие
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -35,10 +35,13 @@ func GzipMiddle(next http.Handler) http.Handler {
 		// создаём gzip.Writer поверх текущего w
 		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		if err != nil {
-			io.WriteString(w, err.Error())
+			_, err := io.WriteString(w, err.Error())
+			if err != nil {
+				mh.logger.Println(err)
+			}
 			return
 		}
-		defer gz.Close()
+		defer mh.logger.Println(gz.Close())
 
 		w.Header().Set("Content-Encoding", "gzip")
 		// передаём обработчику страницы переменную типа gzipWriter для вывода данных
