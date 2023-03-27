@@ -20,6 +20,11 @@ type Metric struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
+type EncData struct {
+	Data0 string `json:"data0"` // зашифрованные данные
+	Data  string `json:"data1"` // зашифрованные данные
+}
+
 // Repository основной интерфейс хранилища метрик
 type Repository interface {
 	Append(ctx context.Context, key string, value int64)

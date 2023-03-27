@@ -2,8 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	crand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -81,6 +90,17 @@ func main() {
 
 func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
 	metricURL := "http://" + cfg.ServerAddress + "/updates/"
+	var pubKey *rsa.PublicKey
+	var dataEnc []byte
+	var err error
+	encrypt := false
+	if cfg.CryptoKey != "" {
+		if pubKey, err = getPubKey(cfg.CryptoKey, logger); err != nil {
+			logger.Fatalf("getPubKey got error: %v", err)
+		}
+		encrypt = true
+	}
+
 	reportTick := time.NewTicker(cfg.ReportInterval)
 	defer reportTick.Stop()
 
@@ -95,10 +115,22 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 			if err != nil {
 				logger.Println(err)
 			}
-			_, err = httpClnt.R().
-				SetHeader("Content-Type", "application/json").
-				SetBody(data).
-				Post(metricURL)
+
+			if encrypt {
+				dataEnc, err = dataToEncJSON(pubKey, data)
+				if err != nil {
+					logger.Println(err)
+				}
+			}
+
+			restyClient := httpClnt.R().SetHeader("Content-Type", "application/json")
+			if encrypt {
+				restyClient.SetHeader("Encrypt-Type", "1").SetBody(dataEnc)
+			} else {
+				restyClient.SetBody(data)
+			}
+
+			_, err = restyClient.Post(metricURL)
 			if err != nil {
 				logger.Print("Error when sent metrics. ", err)
 			}
@@ -211,4 +243,84 @@ func metricsToJSON(mtrcs map[string]interface{}, key string) ([]byte, error) {
 		}
 	}
 	return json.Marshal(metrics)
+}
+
+func getPubKey(fname string, logger *log.Logger) (*rsa.PublicKey, error) {
+	// read public key from file
+	keyFile, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := keyFile.Close(); err != nil {
+			logger.Println(err)
+		}
+	}()
+	pemPubKey := make([]byte, 4*1024)
+	n, err := keyFile.Read(pemPubKey)
+	if err != nil {
+		return nil, err
+	}
+	pemPubKey = pemPubKey[:n]
+
+	// decode public key from pem format
+	pubKey, _ := pem.Decode(pemPubKey)
+	if pubKey == nil || pubKey.Type != "PUBLIC KEY" {
+		return nil, errors.New("not found PUBLIC KEY in file " + fname)
+	}
+	// parse public key from byte slice
+	rsaPubKey, err := x509.ParsePKIXPublicKey(pubKey.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := rsaPubKey.(*rsa.PublicKey)
+	if !ok {
+		return key, errors.New("can't convert key to *rsa.PublicKey")
+	}
+	return key, nil
+}
+
+func dataToEncJSON(key *rsa.PublicKey, data []byte) ([]byte, error) {
+	// gen symm key
+	symmKey, err := genSymmKey(24)
+	if err != nil {
+		return nil, err
+	}
+
+	// encrypt symm key
+	keyEnc, err := rsa.EncryptPKCS1v15(crand.Reader, key, symmKey)
+	if err != nil {
+		return nil, err
+	}
+	// encrypt data
+	cphr, err := aes.NewCipher(symmKey)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(cphr)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(crand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	dataEnc := gcm.Seal(nonce, nonce, data, nil)
+
+	// json marshal
+	return json.Marshal(
+		types.EncData{
+			Data0: base64.StdEncoding.EncodeToString(keyEnc),
+			Data:  base64.StdEncoding.EncodeToString(dataEnc),
+		},
+	)
+}
+
+func genSymmKey(n int) ([]byte, error) {
+	out := make([]byte, n)
+	n1, err := crand.Read(out)
+	if err != nil || n1 != n {
+		return out, err
+	}
+	return out, nil
 }

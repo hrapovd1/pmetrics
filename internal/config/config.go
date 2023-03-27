@@ -21,6 +21,7 @@ type environ struct {
 	StoreFile      string `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
 	IsRestore      bool   `env:"RESTORE" envDefault:"true"`
 	Key            string `env:"KEY" envDefault:""`
+	CryptoKey      string `env:"CRYPTO_KEY" envDefault:""`
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 }
 
@@ -34,6 +35,7 @@ type Config struct {
 	StoreFile      string
 	IsRestore      bool
 	Key            string
+	CryptoKey      string
 	DatabaseDSN    string
 	tagsDefault    map[string]bool
 }
@@ -78,6 +80,12 @@ func NewAgentConf(flags Flags) (*Config, error) {
 		cfg.Key = flags.key
 	} else {
 		cfg.Key = envs.Key
+	}
+	// Определяю файл с публичным ключом шифрования
+	if cfg.tagsDefault["CRYPTO_KEY"] {
+		cfg.CryptoKey = flags.cryptoKey
+	} else {
+		cfg.CryptoKey = envs.CryptoKey
 	}
 	return &cfg, err
 }
@@ -130,6 +138,12 @@ func NewServerConf(flags Flags) (*Config, error) {
 	} else {
 		cfg.Key = envs.Key
 	}
+	// Определяю файл с приватным ключом шифрования
+	if cfg.tagsDefault["CRYPTO_KEY"] {
+		cfg.CryptoKey = flags.cryptoKey
+	} else {
+		cfg.CryptoKey = envs.CryptoKey
+	}
 	// Определяю подключение к БД
 	if cfg.tagsDefault["DATABASE_DSN"] {
 		cfg.DatabaseDSN = flags.dbDSN
@@ -154,6 +168,7 @@ type Flags struct {
 	storeFile      string
 	storeInterval  string
 	key            string
+	cryptoKey      string
 	dbDSN          string
 }
 
@@ -165,6 +180,7 @@ func GetServerFlags() Flags {
 	flag.StringVar(&flags.storeInterval, "i", "", "Interval of write to file in seconds, for example: 30s")
 	flag.StringVar(&flags.storeFile, "f", "", "File where server keep data, for example: /tmp/server.json")
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.StringVar(&flags.cryptoKey, "crypto-key", "", "Path to file with private rsa key for decrypt agent's messages")
 	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
 	flag.Parse()
 	return flags
@@ -177,6 +193,7 @@ func GetAgentFlags() Flags {
 	flag.StringVar(&flags.reportInterval, "r", "", "Interval of sent data to server in seconds, for example: 30s")
 	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
+	flag.StringVar(&flags.cryptoKey, "crypto-key", "", "Path to file with public rsa key for encrypt agent's messages")
 	flag.Parse()
 	return flags
 }
