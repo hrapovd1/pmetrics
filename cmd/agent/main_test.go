@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -196,7 +196,9 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 	require.NoError(t, err)
 
 	var simpleData []types.Metric
+	var simpleDataLock sync.Mutex
 	var encData types.EncData
+	var encDataLock sync.Mutex
 	simpleHandl := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		body, err := io.ReadAll(r.Body)
@@ -205,10 +207,13 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 			return
 		}
 
+		simpleDataLock.Lock()
 		if err := json.Unmarshal(body, &simpleData); err != nil {
+			simpleDataLock.Unlock()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		simpleDataLock.Unlock()
 
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(""))
@@ -225,25 +230,20 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 			return
 		}
 
+		encDataLock.Lock()
 		if err := json.Unmarshal(body, &encData); err != nil {
+			encDataLock.Unlock()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		encDataLock.Unlock()
 
-		fmt.Printf("data0: '%v'\n", encData.Data0)
-		fmt.Printf("data: '%v'\n", encData.Data)
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(""))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	}
-	metrcs := mmetrics{
-		mtrcs: map[string]interface{}{
-			"pollCounter": counter(345),
-			"M1":          gauge(23.09),
-		},
 	}
 	rClient := resty.New()
 
@@ -253,6 +253,13 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		ts := httptest.NewServer(http.HandlerFunc(simpleHandl))
 		defer ts.Close()
 		srvAddr := strings.Split(ts.URL, "//")[1]
+
+		metrcs := mmetrics{
+			mtrcs: map[string]interface{}{
+				"pollCounter": counter(345),
+				"M1":          gauge(23.09),
+			},
+		}
 
 		config := config.Config{
 			CryptoKey:      "",
@@ -270,6 +277,8 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
 
 		time.Sleep(time.Millisecond * 9)
+		simpleDataLock.Lock()
+		defer simpleDataLock.Unlock()
 		assert.Contains(t, simpleData, wantData[0])
 		assert.Contains(t, simpleData, wantData[1])
 	})
@@ -280,6 +289,12 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		ts := httptest.NewServer(http.HandlerFunc(encryptHandl))
 		defer ts.Close()
 		srvAddr := strings.Split(ts.URL, "//")[1]
+		metrcs := mmetrics{
+			mtrcs: map[string]interface{}{
+				"pollCounter": counter(345),
+				"M1":          gauge(23.09),
+			},
+		}
 		config := config.Config{
 			CryptoKey:      tmpFile.Name(),
 			Key:            "",
@@ -290,6 +305,8 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
 
 		time.Sleep(time.Millisecond * 9)
+		encDataLock.Lock()
+		defer encDataLock.Unlock()
 		assert.Equal(t, 160, len(encData.Data))
 		assert.Equal(t, 684, len(encData.Data0))
 
