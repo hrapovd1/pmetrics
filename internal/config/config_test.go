@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfig_NewAgent(t *testing.T) {
+func TestNewAgentConf(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields Config
@@ -28,6 +30,7 @@ func TestConfig_NewAgent(t *testing.T) {
 				Key:            "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"CONFIG":          true,
 					"CRYPTO_KEY":      true,
 					"KEY":             true,
 					"POLL_INTERVAL":   true,
@@ -49,7 +52,7 @@ func TestConfig_NewAgent(t *testing.T) {
 	}
 }
 
-func TestConfig_NewServer(t *testing.T) {
+func TestNewServerConf(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields Config
@@ -67,6 +70,7 @@ func TestConfig_NewServer(t *testing.T) {
 				DatabaseDSN:    "",
 				tagsDefault: map[string]bool{
 					"ADDRESS":         true,
+					"CONFIG":          true,
 					"KEY":             true,
 					"CRYPTO_KEY":      true,
 					"POLL_INTERVAL":   true,
@@ -86,6 +90,14 @@ func TestConfig_NewServer(t *testing.T) {
 			assert.Equal(t, tt.fields, *cfg)
 		})
 	}
+}
+
+func TestConfig_getTags(t *testing.T) {
+	conf := Config{tagsDefault: make(map[string]bool)}
+	conf.getTags("true", nil, true)
+	conf.getTags("false", nil, false)
+	assert.True(t, conf.tagsDefault["true"])
+	assert.False(t, conf.tagsDefault["false"])
 }
 
 func Test_parseInterval(t *testing.T) {
@@ -133,6 +145,106 @@ func Test_parseInterval(t *testing.T) {
 			assert.Equal(t, tt.want, val)
 		})
 	}
+}
+
+func Test_getRawJSONConfig(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "*config.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	tests := []struct {
+		name     string
+		dataSize int
+		positive bool
+	}{
+		{name: "small file", dataSize: 2000, positive: true},
+		{name: "big file", dataSize: 1, positive: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := tmpFile.WriteString(strings.Repeat(" ", test.dataSize))
+			require.NoError(t, err)
+
+			result, err := getRawJSONConfig(tmpFile.Name())
+			if test.positive {
+
+				require.NoError(t, err)
+				assert.Equal(t, test.dataSize, len(result))
+
+			} else {
+
+				require.Error(t, err)
+				assert.Equal(t, tmpFile.Name()+" too big.", err.Error())
+
+			}
+
+		})
+	}
+}
+
+func TestConfig_setConfigFromFile(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "*config.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	_, err = tmpFile.WriteString(`{
+    "address": "localhost:8080",
+    "restore": true,
+    "store_interval": "1s",
+    "store_file": "/path/to/file.db"
+	}`)
+	require.NoError(t, err)
+
+	want := Config{
+		ServerAddress: "localhost:8080",
+		IsRestore:     true,
+		StoreInterval: time.Second * 1,
+		StoreFile:     "/path/to/file.db",
+	}
+
+	conf := Config{}
+	require.NoError(t, conf.setConfigFromFile(tmpFile.Name()))
+	assert.Equal(t, want, conf)
+
+}
+
+func TestConfig_UnmarshalJSON(t *testing.T) {
+	var conf Config
+	tests := []struct {
+		name     string
+		data     []byte
+		positive bool
+	}{
+		{
+			name:     "right data",
+			positive: true,
+			data:     []byte(`{"poll_interval": "2s", "report_interval": "5s", "store_interval": "7s"}`),
+		},
+		{
+			name:     "wrong data",
+			positive: false,
+			data:     []byte(`{"poll_interval: "2s", "report_interval": "5s", "store_interval": "7s"}`),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := conf.UnmarshalJSON(test.data)
+			if test.positive {
+				require.NoError(t, err)
+				assert.Equal(t, time.Second*2, conf.PollInterval)
+				assert.Equal(t, time.Second*5, conf.ReportInterval)
+				assert.Equal(t, time.Second*7, conf.StoreInterval)
+			} else {
+				require.Error(t, err)
+			}
+
+		})
+	}
+}
+
+func TestConfig_valueExists(t *testing.T) {
+	conf := Config{Key: "12345"}
+	assert.True(t, conf.valueExists("Key"))
+	assert.False(t, conf.valueExists("PollInterval"))
 }
 
 func ExampleGetAgentFlags() {

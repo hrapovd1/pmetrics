@@ -3,8 +3,11 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
+	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -23,31 +26,44 @@ type environ struct {
 	Key            string `env:"KEY" envDefault:""`
 	CryptoKey      string `env:"CRYPTO_KEY" envDefault:""`
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
+	ConfigFile     string `env:"CONFIG" envDefault:""`
 }
 
 // Config тип итоговой конфигурации агента или сервера
 type Config struct {
-	PollInterval   time.Duration
-	ReportInterval time.Duration
-	RetryCount     int
-	ServerAddress  string
-	StoreInterval  time.Duration
-	StoreFile      string
-	IsRestore      bool
-	Key            string
-	CryptoKey      string
-	DatabaseDSN    string
-	tagsDefault    map[string]bool
+	PollInterval   time.Duration   `json:"poll_interval,omitempty"`
+	ReportInterval time.Duration   `json:"report_interval,omitempty"`
+	ServerAddress  string          `json:"address,omitempty"`
+	StoreInterval  time.Duration   `json:"store_interval,omitempty"`
+	StoreFile      string          `json:"store_file,omitempty"`
+	IsRestore      bool            `json:"restore,omitempty"`
+	Key            string          `json:"key,omitempty"`
+	CryptoKey      string          `json:"crypto_key,omitempty"`
+	DatabaseDSN    string          `json:"database_dsn,omitempty"`
+	tagsDefault    map[string]bool `json:"-"`
 }
 
 // NewAgentConf генерирует рабочую конфигурацию агента
 func NewAgentConf(flags Flags) (*Config, error) {
 	var cfg Config
+	var fileCfg Config
 	cfg.tagsDefault = make(map[string]bool)
 	var err error
 	var envs environ
 	if err = env.Parse(&envs, env.Options{OnSet: cfg.getTags}); err != nil {
 		return nil, err
+	}
+	// Определяю файл конфигурации и использую как
+	// 3й источник конфигурации
+	if !cfg.tagsDefault["CONFIG"] {
+		if err := fileCfg.setConfigFromFile(envs.ConfigFile); err != nil {
+			return nil, err
+		}
+	}
+	if flags.configFile != "" {
+		if err := fileCfg.setConfigFromFile(flags.configFile); err != nil {
+			return nil, err
+		}
 	}
 	// Определяю интервал опроса метрик
 	var pollInterval string
@@ -56,8 +72,12 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	} else {
 		pollInterval = envs.PollInterval
 	}
-	if cfg.PollInterval, err = parseInterval(pollInterval); err != nil {
-		return nil, err
+	if flags.pollInterval == "" && cfg.tagsDefault["POLL_INTERVAL"] && fileCfg.valueExists("PollInterval") {
+		cfg.PollInterval = fileCfg.PollInterval
+	} else {
+		if cfg.PollInterval, err = parseInterval(pollInterval); err != nil {
+			return nil, err
+		}
 	}
 	// Определяю интервал отправки метрик
 	var reportInterval string
@@ -66,8 +86,12 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	} else {
 		reportInterval = envs.ReportInterval
 	}
-	if cfg.ReportInterval, err = parseInterval(reportInterval); err != nil {
-		return nil, err
+	if flags.reportInterval == "" && cfg.tagsDefault["REPORT_INTERVAL"] && fileCfg.valueExists("ReportInterval") {
+		cfg.ReportInterval = fileCfg.ReportInterval
+	} else {
+		if cfg.ReportInterval, err = parseInterval(reportInterval); err != nil {
+			return nil, err
+		}
 	}
 	// Определяю адрес сервера
 	if flags.address != "" && cfg.tagsDefault["ADDRESS"] {
@@ -75,17 +99,26 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	} else {
 		cfg.ServerAddress = envs.Address
 	}
+	if flags.address == "" && cfg.tagsDefault["ADDRESS"] && fileCfg.valueExists("ServerAddress") {
+		cfg.ServerAddress = fileCfg.ServerAddress
+	}
 	// Определяю ключ для подписи метрик
-	if cfg.tagsDefault["KEY"] {
+	if flags.key != "" && cfg.tagsDefault["KEY"] {
 		cfg.Key = flags.key
 	} else {
 		cfg.Key = envs.Key
 	}
+	if flags.key == "" && cfg.tagsDefault["KEY"] && fileCfg.valueExists("Key") {
+		cfg.Key = fileCfg.Key
+	}
 	// Определяю файл с публичным ключом шифрования
-	if cfg.tagsDefault["CRYPTO_KEY"] {
+	if flags.cryptoKey != "" && cfg.tagsDefault["CRYPTO_KEY"] {
 		cfg.CryptoKey = flags.cryptoKey
 	} else {
 		cfg.CryptoKey = envs.CryptoKey
+	}
+	if flags.cryptoKey == "" && cfg.tagsDefault["CRYPTO_KEY"] && fileCfg.valueExists("CryptoKey") {
+		cfg.CryptoKey = fileCfg.CryptoKey
 	}
 	return &cfg, err
 }
@@ -94,17 +127,33 @@ func NewAgentConf(flags Flags) (*Config, error) {
 func NewServerConf(flags Flags) (*Config, error) {
 	var err error
 	var cfg Config
+	var fileCfg Config
 	cfg.tagsDefault = make(map[string]bool)
 	var envs environ
 	// Разбираю переменные среды и проверяю значение тегов на значение по умолчанию
 	if err = env.Parse(&envs, env.Options{OnSet: cfg.getTags}); err != nil {
 		return nil, err
 	}
+	// Определяю файл конфигурации и использую как
+	// 3й источник конфигурации
+	if !cfg.tagsDefault["CONFIG"] {
+		if err := fileCfg.setConfigFromFile(envs.ConfigFile); err != nil {
+			return nil, err
+		}
+	}
+	if flags.configFile != "" {
+		if err := fileCfg.setConfigFromFile(flags.configFile); err != nil {
+			return nil, err
+		}
+	}
 	// Определяю адрес сервера
 	if flags.address != "" && cfg.tagsDefault["ADDRESS"] {
 		cfg.ServerAddress = flags.address
 	} else {
 		cfg.ServerAddress = envs.Address
+	}
+	if flags.address == "" && cfg.tagsDefault["ADDRESS"] && fileCfg.valueExists("ServerAddress") {
+		cfg.ServerAddress = fileCfg.ServerAddress
 	}
 	// Определяю интервал сохранения в файл
 	var storeInterval string
@@ -113,8 +162,12 @@ func NewServerConf(flags Flags) (*Config, error) {
 	} else {
 		storeInterval = envs.StoreInterval
 	}
-	if cfg.StoreInterval, err = parseInterval(storeInterval); err != nil {
-		return nil, err
+	if flags.storeInterval == "" && cfg.tagsDefault["STORE_INTERVAL"] && fileCfg.valueExists("StoreInterval") {
+		cfg.StoreInterval = fileCfg.StoreInterval
+	} else {
+		if cfg.StoreInterval, err = parseInterval(storeInterval); err != nil {
+			return nil, err
+		}
 	}
 	// Определяю интервал отправки отчета, как значение при storeInterval == 0
 	if cfg.ReportInterval, err = parseInterval(envs.ReportInterval); err != nil {
@@ -126,11 +179,17 @@ func NewServerConf(flags Flags) (*Config, error) {
 	} else {
 		cfg.StoreFile = envs.StoreFile
 	}
+	if flags.storeFile == "" && cfg.tagsDefault["STORE_FILE"] && fileCfg.valueExists("StoreFile") {
+		cfg.StoreFile = fileCfg.StoreFile
+	}
 	// Определяю флаг восстановления метрик при запуске
 	if cfg.tagsDefault["RESTORE"] {
 		cfg.IsRestore = flags.restore
 	} else {
 		cfg.IsRestore = envs.IsRestore
+	}
+	if !flags.restore && cfg.tagsDefault["RESTORE"] && fileCfg.valueExists("IsRestore") {
+		cfg.IsRestore = fileCfg.IsRestore
 	}
 	// Определяю ключ для подписи метрик
 	if cfg.tagsDefault["KEY"] {
@@ -138,17 +197,26 @@ func NewServerConf(flags Flags) (*Config, error) {
 	} else {
 		cfg.Key = envs.Key
 	}
+	if flags.key == "" && cfg.tagsDefault["KEY"] && fileCfg.valueExists("Key") {
+		cfg.Key = fileCfg.Key
+	}
 	// Определяю файл с приватным ключом шифрования
 	if cfg.tagsDefault["CRYPTO_KEY"] {
 		cfg.CryptoKey = flags.cryptoKey
 	} else {
 		cfg.CryptoKey = envs.CryptoKey
 	}
+	if flags.cryptoKey == "" && cfg.tagsDefault["CRYPTO_KEY"] && fileCfg.valueExists("CryptoKey") {
+		cfg.CryptoKey = fileCfg.CryptoKey
+	}
 	// Определяю подключение к БД
 	if cfg.tagsDefault["DATABASE_DSN"] {
 		cfg.DatabaseDSN = flags.dbDSN
 	} else {
 		cfg.DatabaseDSN = envs.DatabaseDSN
+	}
+	if flags.dbDSN == "" && cfg.tagsDefault["DATABASE_DSN"] && fileCfg.valueExists("DatabaseDSN") {
+		cfg.DatabaseDSN = fileCfg.DatabaseDSN
 	}
 
 	return &cfg, err
@@ -157,6 +225,88 @@ func NewServerConf(flags Flags) (*Config, error) {
 // getTags проверка и отметка значений переменных среды что они по умолчанию или нет
 func (cfg *Config) getTags(tag string, value interface{}, isDefault bool) {
 	cfg.tagsDefault[tag] = isDefault
+}
+
+// setConfigFromFile устанавливает параметры конфигурации из файла в формате JSON
+func (cfg *Config) setConfigFromFile(cFile string) error {
+	rawJSON, err := getRawJSONConfig(cFile)
+	if err != nil {
+		return err
+	}
+	if !json.Valid(rawJSON) {
+		return errors.New("JSON from " + cFile + " NOT valid.")
+	}
+	conf := Config{}
+	if err := json.Unmarshal(rawJSON, &conf); err != nil {
+		return err
+	}
+	*cfg = conf
+	return nil
+}
+
+func (cfg *Config) UnmarshalJSON(data []byte) error {
+	type ConfigAlias Config
+
+	aliasValue := &struct {
+		*ConfigAlias
+
+		PollInterval   string `json:"poll_interval,omitempty"`
+		ReportInterval string `json:"report_interval,omitempty"`
+		StoreInterval  string `json:"store_interval,omitempty"`
+	}{
+		ConfigAlias: (*ConfigAlias)(cfg),
+	}
+	if err := json.Unmarshal(data, aliasValue); err != nil {
+		return err
+	}
+	if aliasValue.PollInterval != "" {
+		pollInterval, err := parseInterval(aliasValue.PollInterval)
+		if err != nil {
+			return err
+		}
+		cfg.PollInterval = pollInterval
+	}
+	if aliasValue.ReportInterval != "" {
+		reportInterval, err := parseInterval(aliasValue.ReportInterval)
+		if err != nil {
+			return err
+		}
+		cfg.ReportInterval = reportInterval
+	}
+	if aliasValue.StoreInterval != "" {
+		storeInterval, err := parseInterval(aliasValue.StoreInterval)
+		if err != nil {
+			return err
+		}
+		cfg.StoreInterval = storeInterval
+	}
+	return nil
+}
+
+func (cfg *Config) valueExists(val string) bool {
+	rCfg := reflect.ValueOf(*cfg)
+	return !rCfg.FieldByName(val).IsZero()
+
+}
+
+func getRawJSONConfig(fName string) ([]byte, error) {
+	fileStat, err := os.Stat(fName)
+	if err != nil {
+		return nil, err
+	}
+	if fileStat.Size() > 2000 {
+		return nil, errors.New(fName + " too big.")
+	}
+	rawJSON := make([]byte, 2000)
+	cf, err := os.Open(fName)
+	if err != nil {
+		return nil, err
+	}
+	n, err := cf.Read(rawJSON)
+	if err != nil {
+		return nil, err
+	}
+	return rawJSON[:n], nil
 }
 
 // Flags содержит значения флагов переданные при запуске
@@ -170,6 +320,7 @@ type Flags struct {
 	key            string
 	cryptoKey      string
 	dbDSN          string
+	configFile     string
 }
 
 // GetServerFlags - считывае флаги сервера
@@ -182,6 +333,8 @@ func GetServerFlags() Flags {
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
 	flag.StringVar(&flags.cryptoKey, "crypto-key", "", "Path to file with private rsa key for decrypt agent's messages")
 	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
+	flag.StringVar(&flags.configFile, "c", "", "(or -config) Path to config file in JSON format")
+	flag.StringVar(&flags.configFile, "config", "", "(or -c) Path to config file in JSON format")
 	flag.Parse()
 	return flags
 }
@@ -194,6 +347,8 @@ func GetAgentFlags() Flags {
 	flag.StringVar(&flags.pollInterval, "p", "", "Interval of query metrics in seconds, for example: 30s")
 	flag.StringVar(&flags.key, "k", "", "Key for sign hash sum, if ommited data will sent without sign")
 	flag.StringVar(&flags.cryptoKey, "crypto-key", "", "Path to file with public rsa key for encrypt agent's messages")
+	flag.StringVar(&flags.configFile, "c", "", "(or -config) Path to config file in JSON format")
+	flag.StringVar(&flags.configFile, "config", "", "(or -c) Path to config file in JSON format")
 	flag.Parse()
 	return flags
 }

@@ -7,11 +7,30 @@ import (
 	"os"
 	"testing"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewFileStorage(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "*storage")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	require.NoError(t, tmpFile.Close())
+	storage := NewFileStorage(
+		config.Config{
+			StoreFile:     tmpFile.Name(),
+			StoreInterval: 0,
+		},
+		make(map[string]interface{}),
+	)
+	assert.Equal(t, tmpFile.Name(), storage.file.Name())
+	storage.ms.Append(context.Background(), "M1", int64(34))
+	storage.ms.Append(context.Background(), "M1", int64(34))
+	assert.Equal(t, int64(68), storage.ms.Get(context.Background(), "M1"))
+}
 
 func TestFileStorage_Restore(t *testing.T) {
 	tmpFile, _ := os.CreateTemp("", "devops*.json")
