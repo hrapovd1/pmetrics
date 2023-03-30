@@ -32,9 +32,12 @@ func Test_pollHwMetrics(t *testing.T) {
 		args: mmetrics{pollCounter: counter(0), mtrcs: testMetrics},
 		want: []string{},
 	}
+	wg := &sync.WaitGroup{}
+	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
+		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
 		defer cancel()
+		wg.Add(1)
 		pollHwMetrics(ctx, &test.args, time.Microsecond*500, log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime))
 		for _, val := range test.want {
 			_, ok := test.args.mtrcs[val]
@@ -83,9 +86,12 @@ func Test_pollMetrics(t *testing.T) {
 			"RandomValue",
 		},
 	}
+	wg := &sync.WaitGroup{}
+	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
+		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
 		defer cancel()
+		wg.Add(1)
 		pollMetrics(ctx, &test.args, time.Microsecond*500)
 		for _, val := range test.want {
 			_, ok := test.args.mtrcs[val]
@@ -196,9 +202,7 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 	require.NoError(t, err)
 
 	var simpleData []types.Metric
-	var simpleDataLock sync.Mutex
 	var encData types.EncData
-	var encDataLock sync.Mutex
 	simpleHandl := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		body, err := io.ReadAll(r.Body)
@@ -207,13 +211,10 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 			return
 		}
 
-		simpleDataLock.Lock()
 		if err := json.Unmarshal(body, &simpleData); err != nil {
-			simpleDataLock.Unlock()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		simpleDataLock.Unlock()
 
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(""))
@@ -230,13 +231,10 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 			return
 		}
 
-		encDataLock.Lock()
 		if err := json.Unmarshal(body, &encData); err != nil {
-			encDataLock.Unlock()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		encDataLock.Unlock()
 
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(""))
@@ -246,10 +244,10 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		}
 	}
 	rClient := resty.New()
+	wg := &sync.WaitGroup{}
+	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
 
 	t.Run("simple data", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		ts := httptest.NewServer(http.HandlerFunc(simpleHandl))
 		defer ts.Close()
 		srvAddr := strings.Split(ts.URL, "//")[1]
@@ -264,7 +262,7 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		config := config.Config{
 			CryptoKey:      "",
 			Key:            "",
-			ReportInterval: time.Millisecond * 5,
+			ReportInterval: time.Millisecond * 2,
 			ServerAddress:  srvAddr,
 		}
 		counter := int64(345)
@@ -274,18 +272,18 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 			{ID: "M1", MType: "gauge", Value: &value},
 		}
 
+		wg.Add(1)
+		ctx, cancel := context.WithTimeout(vctx, time.Millisecond*3)
+		defer cancel()
 		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
 
-		time.Sleep(time.Millisecond * 9)
-		simpleDataLock.Lock()
-		defer simpleDataLock.Unlock()
+		<-ctx.Done()
+		wg.Wait()
 		assert.Contains(t, simpleData, wantData[0])
 		assert.Contains(t, simpleData, wantData[1])
 	})
 
 	t.Run("encrypted data", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		ts := httptest.NewServer(http.HandlerFunc(encryptHandl))
 		defer ts.Close()
 		srvAddr := strings.Split(ts.URL, "//")[1]
@@ -298,15 +296,17 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		config := config.Config{
 			CryptoKey:      tmpFile.Name(),
 			Key:            "",
-			ReportInterval: time.Millisecond * 5,
+			ReportInterval: time.Millisecond * 2,
 			ServerAddress:  srvAddr,
 		}
 
+		wg.Add(1)
+		ctx, cancel := context.WithTimeout(vctx, time.Millisecond*3)
+		defer cancel()
 		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
 
-		time.Sleep(time.Millisecond * 9)
-		encDataLock.Lock()
-		defer encDataLock.Unlock()
+		<-ctx.Done()
+		wg.Wait()
 		assert.Equal(t, 160, len(encData.Data))
 		assert.Equal(t, 684, len(encData.Data0))
 

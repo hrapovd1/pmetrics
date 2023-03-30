@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -35,13 +36,16 @@ var (
 	buildCommit  string
 )
 
-type gauge float64
-type counter int64
-type mmetrics struct {
-	mu          sync.Mutex
-	pollCounter counter
-	mtrcs       map[string]interface{}
-}
+type (
+	gauge    float64
+	counter  int64
+	mmetrics struct {
+		mu          sync.Mutex
+		pollCounter counter
+		mtrcs       map[string]interface{}
+	}
+	waitgrp string
+)
 
 func main() {
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
@@ -50,8 +54,8 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	nctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
 	metrics := mmetrics{
 		pollCounter: counter(0),
@@ -59,10 +63,6 @@ func main() {
 	}
 
 	httpClient := resty.New()
-
-	sigint := make(chan os.Signal, 1)
-	defer close(sigint)
-	signal.Notify(sigint, os.Interrupt)
 
 	if buildVersion == "" {
 		buildVersion = "N/A"
@@ -80,19 +80,27 @@ func main() {
 	logger.Printf("\tBuild commit: %s\n", buildCommit)
 	defer logger.Println("stopped")
 
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	ctx := context.WithValue(nctx, waitgrp("WG"), wg)
+
 	go pollMetrics(ctx, &metrics, agentConf.PollInterval)
 	go pollHwMetrics(ctx, &metrics, agentConf.PollInterval, logger)
 
 	go reportMetrics(ctx, &metrics, *agentConf, httpClient, logger)
 
-	<-sigint
+	wg.Wait()
 }
 
 func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
 	metricURL := "http://" + cfg.ServerAddress + "/updates/"
-	var pubKey *rsa.PublicKey
-	var dataEnc []byte
-	var err error
+	var (
+		pubKey  *rsa.PublicKey
+		dataEnc []byte
+		err     error
+	)
+	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	defer waitGroup.Done()
 	encrypt := false
 	if cfg.CryptoKey != "" {
 		if pubKey, err = getPubKey(cfg.CryptoKey, logger); err != nil {
@@ -139,6 +147,8 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 }
 
 func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration) {
+	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	defer waitGroup.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {
@@ -187,6 +197,8 @@ func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration
 }
 
 func pollHwMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
+	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	defer waitGroup.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {
