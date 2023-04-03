@@ -50,3 +50,6 @@ type MetricModel struct {
 	Value     sql.NullFloat64
 	Delta     sql.NullInt64
 }
+
+// Waitgrp тип для передачи wait group в контексте
+type Waitgrp string

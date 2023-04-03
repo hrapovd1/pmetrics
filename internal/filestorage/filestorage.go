@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
@@ -93,9 +94,14 @@ func (fs *FileStorage) Restore(ctx context.Context) error {
 		for scan.Scan() {
 			data = scan.Bytes()
 		}
-		err = json.Unmarshal(data, &metrics)
+		if err = scan.Err(); err != nil {
+			return err
+		}
+		if err = json.Unmarshal(data, &metrics); err != nil {
+			return err
+		}
 		fs.ms.StoreAll(ctx, &metrics)
-		return err
+		return nil
 	}
 }
 
@@ -135,10 +141,17 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 
 // Storing запускается в отдельной go routine для сохранения метрик в файл
 func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
-	defer logger.Println(fs.Close())
+	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
+	defer func() {
+		if err := fs.Close(); err != nil {
+			logger.Printf("fs.Close: %v", err)
+		}
+		waitGroup.Done()
+	}()
+
 	if restore {
 		if err := fs.Restore(ctx); err != nil {
-			logger.Println(err)
+			logger.Printf("fs.Restore err: %v", err)
 		}
 	}
 	storeTick := time.NewTicker(interval)
@@ -149,7 +162,7 @@ func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval
 			return
 		case <-storeTick.C:
 			if err := fs.Store(ctx); err != nil {
-				logger.Println(err)
+				logger.Printf("fs.Store err: %v", err)
 			}
 		}
 	}

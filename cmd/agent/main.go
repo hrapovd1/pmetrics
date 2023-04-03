@@ -44,7 +44,6 @@ type (
 		pollCounter counter
 		mtrcs       map[string]interface{}
 	}
-	waitgrp string
 )
 
 func main() {
@@ -82,7 +81,7 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
-	ctx := context.WithValue(nctx, waitgrp("WG"), wg)
+	ctx := context.WithValue(nctx, types.Waitgrp("WG"), wg)
 
 	go pollMetrics(ctx, &metrics, agentConf.PollInterval)
 	go pollHwMetrics(ctx, &metrics, agentConf.PollInterval, logger)
@@ -99,7 +98,7 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 		dataEnc []byte
 		err     error
 	)
-	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
 	defer waitGroup.Done()
 	encrypt := false
 	if cfg.CryptoKey != "" {
@@ -147,7 +146,7 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 }
 
 func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration) {
-	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
 	defer waitGroup.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
@@ -197,7 +196,7 @@ func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration
 }
 
 func pollHwMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
-	waitGroup := ctx.Value(waitgrp("WG")).(*sync.WaitGroup)
+	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
 	defer waitGroup.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()

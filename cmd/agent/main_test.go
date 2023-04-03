@@ -33,7 +33,7 @@ func Test_pollHwMetrics(t *testing.T) {
 		want: []string{},
 	}
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
+	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
 		defer cancel()
@@ -87,7 +87,7 @@ func Test_pollMetrics(t *testing.T) {
 		},
 	}
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
+	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
 		defer cancel()
@@ -245,7 +245,7 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 	}
 	rClient := resty.New()
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), waitgrp("WG"), wg)
+	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 
 	t.Run("simple data", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(simpleHandl))
