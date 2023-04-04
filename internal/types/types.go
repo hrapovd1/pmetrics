@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -39,7 +40,7 @@ type Storager interface {
 	Close() error
 	Ping(ctx context.Context) bool
 	Restore(ctx context.Context) error
-	Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool)
+	Storing(ctx context.Context, w *sync.WaitGroup, logger *log.Logger, interval time.Duration, restore bool)
 }
 
 // MetricModel модель таблицы для хранения метрики в базе
@@ -50,6 +51,3 @@ type MetricModel struct {
 	Value     sql.NullFloat64
 	Delta     sql.NullInt64
 }
-
-// Waitgrp тип для передачи wait group в контексте
-type Waitgrp string

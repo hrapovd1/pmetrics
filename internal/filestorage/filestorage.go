@@ -140,13 +140,12 @@ func (fs *FileStorage) Store(ctx context.Context) error {
 }
 
 // Storing запускается в отдельной go routine для сохранения метрик в файл
-func (fs *FileStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
-	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
+func (fs *FileStorage) Storing(ctx context.Context, w *sync.WaitGroup, logger *log.Logger, interval time.Duration, restore bool) {
 	defer func() {
 		if err := fs.Close(); err != nil {
 			logger.Printf("fs.Close: %v", err)
 		}
-		waitGroup.Done()
+		w.Done()
 	}()
 
 	if restore {

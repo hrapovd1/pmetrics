@@ -195,7 +195,6 @@ func TestFileStorage_Storing(t *testing.T) {
 	buff := make(map[string]interface{})
 
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 
 	t.Run("check restore", func(t *testing.T) {
 		fs := NewFileStorage(config.Config{
@@ -203,9 +202,9 @@ func TestFileStorage_Storing(t *testing.T) {
 			StoreFile:     tmpFile.Name(),
 		}, buff)
 		wantData := map[string]interface{}{"M1": int64(345), "M2": float64(63.689)}
-		ctx, cancel := context.WithCancel(vctx)
+		ctx, cancel := context.WithCancel(context.Background())
 		wg.Add(1)
-		go fs.Storing(ctx, log.Default(), time.Second, true)
+		go fs.Storing(ctx, wg, log.Default(), time.Second, true)
 		time.AfterFunc(time.Millisecond*2, cancel)
 		wg.Wait()
 		assert.Equal(t, wantData, buff)
@@ -221,9 +220,9 @@ func TestFileStorage_Storing(t *testing.T) {
 		want3 := `{"id":"M1","type":"counter","delta":345}`
 		offset, err := tmpFile.Stat()
 		require.NoError(t, err)
-		ctx, cancel := context.WithCancel(vctx)
+		ctx, cancel := context.WithCancel(context.Background())
 		wg.Add(1)
-		go fs.Storing(ctx, log.Default(), time.Millisecond, false)
+		go fs.Storing(ctx, wg, log.Default(), time.Millisecond, false)
 		time.AfterFunc(time.Millisecond*2, cancel)
 		wg.Wait()
 		fContent := make([]byte, 1024)

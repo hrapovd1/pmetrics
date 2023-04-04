@@ -53,7 +53,7 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	nctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer stop()
 
 	metrics := mmetrics{
@@ -81,25 +81,23 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
-	ctx := context.WithValue(nctx, types.Waitgrp("WG"), wg)
 
-	go pollMetrics(ctx, &metrics, agentConf.PollInterval)
-	go pollHwMetrics(ctx, &metrics, agentConf.PollInterval, logger)
+	go pollMetrics(ctx, wg, &metrics, agentConf.PollInterval)
+	go pollHwMetrics(ctx, wg, &metrics, agentConf.PollInterval, logger)
 
-	go reportMetrics(ctx, &metrics, *agentConf, httpClient, logger)
+	go reportMetrics(ctx, wg, &metrics, *agentConf, httpClient, logger)
 
 	wg.Wait()
 }
 
-func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
+func reportMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
 	metricURL := "http://" + cfg.ServerAddress + "/updates/"
 	var (
 		pubKey  *rsa.PublicKey
 		dataEnc []byte
 		err     error
 	)
-	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
-	defer waitGroup.Done()
+	defer w.Done()
 	encrypt := false
 	if cfg.CryptoKey != "" {
 		if pubKey, err = getPubKey(cfg.CryptoKey, logger); err != nil {
@@ -145,9 +143,8 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 	}
 }
 
-func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration) {
-	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
-	defer waitGroup.Done()
+func pollMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, pollIntvl time.Duration) {
+	defer w.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {
@@ -195,9 +192,8 @@ func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration
 	}
 }
 
-func pollHwMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
-	waitGroup := ctx.Value(types.Waitgrp("WG")).(*sync.WaitGroup)
-	defer waitGroup.Done()
+func pollHwMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
+	defer w.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {

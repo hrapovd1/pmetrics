@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -148,6 +149,7 @@ func TestDBStorage_Storing(t *testing.T) {
 	require.NoError(t, err)
 	ds.Storing(
 		context.Background(),
+		&sync.WaitGroup{},
 		log.Default(),
 		0,
 		true,

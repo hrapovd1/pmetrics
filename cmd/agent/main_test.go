@@ -33,12 +33,11 @@ func Test_pollHwMetrics(t *testing.T) {
 		want: []string{},
 	}
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
 		defer cancel()
 		wg.Add(1)
-		pollHwMetrics(ctx, &test.args, time.Microsecond*500, log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime))
+		pollHwMetrics(ctx, wg, &test.args, time.Microsecond*500, log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime))
 		for _, val := range test.want {
 			_, ok := test.args.mtrcs[val]
 			assert.True(t, ok)
@@ -87,12 +86,11 @@ func Test_pollMetrics(t *testing.T) {
 		},
 	}
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 	t.Run(test.name, func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(vctx, time.Microsecond*600)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*600)
 		defer cancel()
 		wg.Add(1)
-		pollMetrics(ctx, &test.args, time.Microsecond*500)
+		pollMetrics(ctx, wg, &test.args, time.Microsecond*500)
 		for _, val := range test.want {
 			_, ok := test.args.mtrcs[val]
 			assert.True(t, ok)
@@ -245,7 +243,6 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 	}
 	rClient := resty.New()
 	wg := &sync.WaitGroup{}
-	vctx := context.WithValue(context.Background(), types.Waitgrp("WG"), wg)
 
 	t.Run("simple data", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(simpleHandl))
@@ -273,9 +270,9 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		}
 
 		wg.Add(1)
-		ctx, cancel := context.WithTimeout(vctx, time.Millisecond*3)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*3)
 		defer cancel()
-		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
+		go reportMetrics(ctx, wg, &metrcs, config, rClient, log.Default())
 
 		<-ctx.Done()
 		wg.Wait()
@@ -301,9 +298,9 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 		}
 
 		wg.Add(1)
-		ctx, cancel := context.WithTimeout(vctx, time.Millisecond*3)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*3)
 		defer cancel()
-		go reportMetrics(ctx, &metrcs, config, rClient, log.Default())
+		go reportMetrics(ctx, wg, &metrcs, config, rClient, log.Default())
 
 		<-ctx.Done()
 		wg.Wait()
