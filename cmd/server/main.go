@@ -57,10 +57,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer stop()
 
-	wg := &sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 
 	wg.Add(1)
-	go handlerStorage.Storing(ctx, wg, logger, serverConf.StoreInterval, serverConf.IsRestore)
+	go handlerStorage.Storing(ctx, &wg, logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
 	router.Use(handlerMetrics.DecryptMiddle)
@@ -94,7 +94,7 @@ func main() {
 			l.Println(err)
 		}
 
-	}(ctx, wg, &server, logger)
+	}(ctx, &wg, &server, logger)
 
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		logger.Fatal(err)
