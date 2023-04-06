@@ -81,7 +81,11 @@ func NewMetricsHandler(conf config.Config, logger *log.Logger) *MetricsHandler {
 func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer mh.logger.Println(r.Body.Close())
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			mh.logger.Println(err)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -147,7 +151,11 @@ func (mh *MetricsHandler) UpdateHandler(rw http.ResponseWriter, r *http.Request)
 func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer mh.logger.Println(r.Body.Close())
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			mh.logger.Println(err)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -190,7 +198,11 @@ func (mh *MetricsHandler) UpdatesHandler(rw http.ResponseWriter, r *http.Request
 func (mh *MetricsHandler) GetMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	defer mh.logger.Println(r.Body.Close())
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			mh.logger.Println(err)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)

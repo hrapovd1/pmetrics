@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -107,7 +108,7 @@ func (ms *MemStorage) Ping(ctx context.Context) bool { return false }
 func (ms *MemStorage) Restore(ctx context.Context) error { return nil }
 
 // Storing для реализации интерфейса Storager
-func (ms *MemStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
+func (ms *MemStorage) Storing(ctx context.Context, w *sync.WaitGroup, logger *log.Logger, interval time.Duration, restore bool) {
 }
 
 // WitBuffer модифицирует MemStorage позволяя передать внешний буфер

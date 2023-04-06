@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -103,15 +104,20 @@ func (ds *DBStorage) StoreAll(ctx context.Context, metrics *[]types.Metric) {
 }
 
 // Storing запускается в отдельной go routine для сохранения метрик в файл
-func (ds *DBStorage) Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool) {
+func (ds *DBStorage) Storing(ctx context.Context, w *sync.WaitGroup, logger *log.Logger, interval time.Duration, restore bool) {
 	stor := ds.backStor.(types.Storager)
-	stor.Storing(ctx, logger, interval, restore)
+	stor.Storing(ctx, w, logger, interval, restore)
 }
 
 // Close закрывает подключение к БД, необходимо запускать в defer
 func (ds *DBStorage) Close() error {
 	stor := ds.backStor.(types.Storager)
-	defer ds.logger.Println(stor.Close())
+	defer func() {
+		if err := stor.Close(); err != nil {
+			ds.logger.Print(err)
+		}
+	}()
+	ds.logger.Print("call DBStorage.Close()")
 	return ds.dbConnect.Close()
 }
 

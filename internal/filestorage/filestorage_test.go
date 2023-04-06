@@ -4,14 +4,36 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"log"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/hrapovd1/pmetrics/internal/config"
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewFileStorage(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "*storage")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	require.NoError(t, tmpFile.Close())
+	storage := NewFileStorage(
+		config.Config{
+			StoreFile:     tmpFile.Name(),
+			StoreInterval: 0,
+		},
+		make(map[string]interface{}),
+	)
+	assert.Equal(t, tmpFile.Name(), storage.file.Name())
+	storage.ms.Append(context.Background(), "M1", int64(34))
+	storage.ms.Append(context.Background(), "M1", int64(34))
+	assert.Equal(t, int64(68), storage.ms.Get(context.Background(), "M1"))
+}
 
 func TestFileStorage_Restore(t *testing.T) {
 	tmpFile, _ := os.CreateTemp("", "devops*.json")
@@ -162,4 +184,55 @@ func TestFileStorage_StoreAll(t *testing.T) {
 	}
 	fs.StoreAll(ctx, &metrics)
 	assert.Equal(t, result, buff)
+}
+
+func TestFileStorage_Storing(t *testing.T) {
+	tmpFile, _ := os.CreateTemp("", "*storage")
+	defer os.Remove(tmpFile.Name())
+	_, err := tmpFile.WriteString(`[{"id":"M1","type":"counter","delta":345},{"id":"M2","type":"gauge","value":63.689}]`)
+	require.NoError(t, err)
+
+	buff := make(map[string]interface{})
+
+	wg := &sync.WaitGroup{}
+
+	t.Run("check restore", func(t *testing.T) {
+		fs := NewFileStorage(config.Config{
+			StoreInterval: 0,
+			StoreFile:     tmpFile.Name(),
+		}, buff)
+		wantData := map[string]interface{}{"M1": int64(345), "M2": float64(63.689)}
+		ctx, cancel := context.WithCancel(context.Background())
+		wg.Add(1)
+		go fs.Storing(ctx, wg, log.Default(), time.Second, true)
+		time.AfterFunc(time.Millisecond*2, cancel)
+		wg.Wait()
+		assert.Equal(t, wantData, buff)
+	})
+	t.Run("check store", func(t *testing.T) {
+		fs := NewFileStorage(config.Config{
+			StoreInterval: 0,
+			StoreFile:     tmpFile.Name(),
+		}, buff)
+		buff["M3"] = int64(123)
+		want1 := `{"id":"M2","type":"gauge","value":63.689}`
+		want2 := `{"id":"M3","type":"counter","delta":123}`
+		want3 := `{"id":"M1","type":"counter","delta":345}`
+		offset, err := tmpFile.Stat()
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		wg.Add(1)
+		go fs.Storing(ctx, wg, log.Default(), time.Millisecond, false)
+		time.AfterFunc(time.Millisecond*2, cancel)
+		wg.Wait()
+		fContent := make([]byte, 1024)
+		n, err := tmpFile.ReadAt(fContent, offset.Size())
+		if err != io.EOF {
+			require.NoError(t, err)
+		}
+		fContent = fContent[:n]
+		assert.Contains(t, string(fContent), want1)
+		assert.Contains(t, string(fContent), want2)
+		assert.Contains(t, string(fContent), want3)
+	})
 }

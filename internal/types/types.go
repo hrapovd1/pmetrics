@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,11 @@ type Metric struct {
 	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
+}
+
+type EncData struct {
+	Data0 string `json:"data0"` // зашифрованные данные
+	Data  string `json:"data1"` // зашифрованные данные
 }
 
 // Repository основной интерфейс хранилища метрик
@@ -34,7 +40,7 @@ type Storager interface {
 	Close() error
 	Ping(ctx context.Context) bool
 	Restore(ctx context.Context) error
-	Storing(ctx context.Context, logger *log.Logger, interval time.Duration, restore bool)
+	Storing(ctx context.Context, w *sync.WaitGroup, logger *log.Logger, interval time.Duration, restore bool)
 }
 
 // MetricModel модель таблицы для хранения метрики в базе

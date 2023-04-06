@@ -2,14 +2,24 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	crand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -26,13 +36,15 @@ var (
 	buildCommit  string
 )
 
-type gauge float64
-type counter int64
-type mmetrics struct {
-	mu          sync.Mutex
-	pollCounter counter
-	mtrcs       map[string]interface{}
-}
+type (
+	gauge    float64
+	counter  int64
+	mmetrics struct {
+		mu          sync.Mutex
+		pollCounter counter
+		mtrcs       map[string]interface{}
+	}
+)
 
 func main() {
 	logger := log.New(os.Stdout, "AGENT\t", log.Ldate|log.Ltime)
@@ -41,8 +53,8 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
 	metrics := mmetrics{
 		pollCounter: counter(0),
@@ -50,10 +62,6 @@ func main() {
 	}
 
 	httpClient := resty.New()
-
-	sigint := make(chan os.Signal, 1)
-	defer close(sigint)
-	signal.Notify(sigint, os.Interrupt)
 
 	if buildVersion == "" {
 		buildVersion = "N/A"
@@ -71,16 +79,33 @@ func main() {
 	logger.Printf("\tBuild commit: %s\n", buildCommit)
 	defer logger.Println("stopped")
 
-	go pollMetrics(ctx, &metrics, agentConf.PollInterval)
-	go pollHwMetrics(ctx, &metrics, agentConf.PollInterval, logger)
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
 
-	go reportMetrics(ctx, &metrics, *agentConf, httpClient, logger)
+	go pollMetrics(ctx, wg, &metrics, agentConf.PollInterval)
+	go pollHwMetrics(ctx, wg, &metrics, agentConf.PollInterval, logger)
 
-	<-sigint
+	go reportMetrics(ctx, wg, &metrics, *agentConf, httpClient, logger)
+
+	wg.Wait()
 }
 
-func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
+func reportMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
 	metricURL := "http://" + cfg.ServerAddress + "/updates/"
+	var (
+		pubKey  *rsa.PublicKey
+		dataEnc []byte
+		err     error
+	)
+	defer w.Done()
+	encrypt := false
+	if cfg.CryptoKey != "" {
+		if pubKey, err = getPubKey(cfg.CryptoKey, logger); err != nil {
+			logger.Fatalf("getPubKey got error: %v", err)
+		}
+		encrypt = true
+	}
+
 	reportTick := time.NewTicker(cfg.ReportInterval)
 	defer reportTick.Stop()
 
@@ -95,10 +120,22 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 			if err != nil {
 				logger.Println(err)
 			}
-			_, err = httpClnt.R().
-				SetHeader("Content-Type", "application/json").
-				SetBody(data).
-				Post(metricURL)
+
+			if encrypt {
+				dataEnc, err = dataToEncJSON(pubKey, data)
+				if err != nil {
+					logger.Println(err)
+				}
+			}
+
+			restyClient := httpClnt.R().SetHeader("Content-Type", "application/json")
+			if encrypt {
+				restyClient.SetHeader("Encrypt-Type", "1").SetBody(dataEnc)
+			} else {
+				restyClient.SetBody(data)
+			}
+
+			_, err = restyClient.Post(metricURL)
 			if err != nil {
 				logger.Print("Error when sent metrics. ", err)
 			}
@@ -106,7 +143,8 @@ func reportMetrics(ctx context.Context, metrics *mmetrics, cfg config.Config, ht
 	}
 }
 
-func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration) {
+func pollMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, pollIntvl time.Duration) {
+	defer w.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {
@@ -154,7 +192,8 @@ func pollMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration
 	}
 }
 
-func pollHwMetrics(ctx context.Context, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
+func pollHwMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, pollIntvl time.Duration, logger *log.Logger) {
+	defer w.Done()
 	pollTick := time.NewTicker(pollIntvl)
 	defer pollTick.Stop()
 	for {
@@ -211,4 +250,84 @@ func metricsToJSON(mtrcs map[string]interface{}, key string) ([]byte, error) {
 		}
 	}
 	return json.Marshal(metrics)
+}
+
+func getPubKey(fname string, logger *log.Logger) (*rsa.PublicKey, error) {
+	// read public key from file
+	keyFile, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := keyFile.Close(); err != nil {
+			logger.Println(err)
+		}
+	}()
+	pemPubKey := make([]byte, 4*1024)
+	n, err := keyFile.Read(pemPubKey)
+	if err != nil {
+		return nil, err
+	}
+	pemPubKey = pemPubKey[:n]
+
+	// decode public key from pem format
+	pubKey, _ := pem.Decode(pemPubKey)
+	if pubKey == nil || pubKey.Type != "PUBLIC KEY" {
+		return nil, errors.New("not found PUBLIC KEY in file " + fname)
+	}
+	// parse public key from byte slice
+	rsaPubKey, err := x509.ParsePKIXPublicKey(pubKey.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := rsaPubKey.(*rsa.PublicKey)
+	if !ok {
+		return key, errors.New("can't convert key to *rsa.PublicKey")
+	}
+	return key, nil
+}
+
+func dataToEncJSON(key *rsa.PublicKey, data []byte) ([]byte, error) {
+	// gen symm key
+	symmKey, err := genSymmKey(24)
+	if err != nil {
+		return nil, err
+	}
+
+	// encrypt symm key
+	keyEnc, err := rsa.EncryptPKCS1v15(crand.Reader, key, symmKey)
+	if err != nil {
+		return nil, err
+	}
+	// encrypt data
+	cphr, err := aes.NewCipher(symmKey)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(cphr)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(crand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	dataEnc := gcm.Seal(nonce, nonce, data, nil)
+
+	// json marshal
+	return json.Marshal(
+		types.EncData{
+			Data0: base64.StdEncoding.EncodeToString(keyEnc),
+			Data:  base64.StdEncoding.EncodeToString(dataEnc),
+		},
+	)
+}
+
+func genSymmKey(n int) ([]byte, error) {
+	out := make([]byte, n)
+	n1, err := crand.Read(out)
+	if err != nil || n1 != n {
+		return out, err
+	}
+	return out, nil
 }
