@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -275,4 +276,109 @@ YwFAIVfOBFwuenyO1cI5dw5sW05PyeN3HxflJxV0Icg+jxnICfKyh3HSQXdL4Fwp
 
 	assert.Equal(t, "Test data.", string(result))
 
+}
+
+func Test_checkAddr(t *testing.T) {
+	tests := []struct {
+		name     string
+		address  string
+		subNet   string
+		positive bool
+	}{
+		{"correct", "192.168.0.1", "192.168.0.0/16", true},
+		{"wrong subNet", "192.168.0.1", "192.168.1.0/24", false},
+		{"wrong subNet address", "192.168.0.1", "192.168.10/24", false},
+		{"wrong subNet mask", "192.168.0.1", "192.168.1.0/33", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			addr := net.ParseIP(test.address)
+			if test.positive {
+				res, err := checkAddr(addr, test.subNet)
+				require.NoError(t, err)
+				assert.True(t, res)
+			} else {
+				res, err := checkAddr(addr, test.subNet)
+				if err == nil {
+					assert.False(t, res)
+				} else {
+					assert.Error(t, err)
+				}
+			}
+		})
+	}
+}
+
+func TestMetricsHandler_CheckAgentNetMiddle(t *testing.T) {
+	var req []byte
+	simpleHandl := func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var err error
+		req, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(""))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	t.Run("with header", func(t *testing.T) {
+		clientReq := []byte("test")
+		mh := MetricsHandler{
+			Config: config.Config{TrustedSubnet: "192.168.1.0/24"},
+			logger: log.Default(),
+		}
+		request := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(clientReq))
+		request.Header.Set("X-Real-IP", "192.168.1.1")
+
+		rec := httptest.NewRecorder()
+		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		assert.Equal(t, clientReq, req)
+	})
+	t.Run("without header", func(t *testing.T) {
+		clientReq := []byte("test1")
+		mh := MetricsHandler{
+			Config: config.Config{TrustedSubnet: "192.168.1.0/24"},
+			logger: log.Default(),
+		}
+		request := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(clientReq))
+
+		rec := httptest.NewRecorder()
+		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		assert.Equal(t, http.StatusForbidden, rec.Result().StatusCode)
+		assert.NotEqual(t, clientReq, req)
+	})
+	t.Run("wrong header", func(t *testing.T) {
+		clientReq := []byte("test2")
+		mh := MetricsHandler{
+			Config: config.Config{TrustedSubnet: "192.168.1.0/24"},
+			logger: log.Default(),
+		}
+		request := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(clientReq))
+		request.Header.Set("X-Real-IP", "192.168.0.1")
+
+		rec := httptest.NewRecorder()
+		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		assert.Equal(t, http.StatusForbidden, rec.Result().StatusCode)
+		assert.NotEqual(t, clientReq, req)
+	})
+	t.Run("without trusted subnet", func(t *testing.T) {
+		clientReq := []byte("test3")
+		mh := MetricsHandler{
+			Config: config.Config{TrustedSubnet: ""},
+			logger: log.Default(),
+		}
+		request := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(clientReq))
+		request.Header.Set("X-Real-IP", "192.168.1.1")
+
+		rec := httptest.NewRecorder()
+		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		assert.Equal(t, clientReq, req)
+	})
 }

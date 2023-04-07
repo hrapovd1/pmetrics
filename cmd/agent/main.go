@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -61,7 +62,10 @@ func main() {
 		mtrcs:       make(map[string]interface{}, 29),
 	}
 
+	localAddr := getLocalAddr(*agentConf, logger)
+
 	httpClient := resty.New()
+	httpClient.SetHeader("X-Real-IP", localAddr)
 
 	if buildVersion == "" {
 		buildVersion = "N/A"
@@ -330,4 +334,22 @@ func genSymmKey(n int) ([]byte, error) {
 		return out, err
 	}
 	return out, nil
+}
+
+func getLocalAddr(conf config.Config, logger *log.Logger) string {
+	confAddr := net.ParseIP(conf.TrustedSubnet)
+	if confAddr != nil {
+		return confAddr.String()
+	}
+	conn, err := net.Dial("tcp", conf.ServerAddress)
+	if err != nil {
+		logger.Printf("when try to dial server %v got error: %v\n", conf.ServerAddress, err)
+		return ""
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Printf("when close connection got error: %v\n", err)
+		}
+	}()
+	return conn.LocalAddr().(*net.TCPAddr).IP.String()
 }

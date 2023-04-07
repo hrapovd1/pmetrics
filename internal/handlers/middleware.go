@@ -16,8 +16,10 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -117,6 +119,35 @@ func (mh *MetricsHandler) DecryptMiddle(next http.Handler) http.Handler {
 	})
 }
 
+func (mh *MetricsHandler) CheckAgentNetMiddle(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case mh.Config.TrustedSubnet == "":
+			next.ServeHTTP(w, r)
+			return
+		case r.Header.Get("X-Real-IP") != "":
+			agentAddr := net.ParseIP(r.Header.Get("X-Real-IP"))
+			if agentAddr == nil {
+				break
+			}
+			allow, err := checkAddr(agentAddr, mh.Config.TrustedSubnet)
+			if err != nil {
+				mh.logger.Printf("got error when check agent address: %v\n", err)
+				break
+			}
+			if !allow {
+				mh.logger.Printf("Try to connect from untusted address: %v\n", agentAddr.String())
+				break
+			}
+			next.ServeHTTP(w, r)
+			return
+		default:
+			mh.logger.Println("Try to connect without X-Real-IP header")
+		}
+		http.Error(w, "Unknown agent forbidden", http.StatusForbidden)
+	})
+}
+
 func getPrivKey(fname string, logger *log.Logger) (*rsa.PrivateKey, error) {
 	// read private key from file
 	keyFile, err := os.Open(fname)
@@ -183,4 +214,16 @@ func decryptData(dData types.EncData, privKey *rsa.PrivateKey) ([]byte, error) {
 	}
 	nonce, encDataJSON := encJSON[:nonceSize], encJSON[nonceSize:]
 	return gcmDecrypt.Open(nil, nonce, encDataJSON, nil)
+}
+
+func checkAddr(addr net.IP, trustSubNet string) (bool, error) {
+	subNet := strings.Split(trustSubNet, "/")
+	trustNet := net.ParseIP(subNet[0])
+	mask, err := strconv.Atoi(subNet[1])
+	if err != nil {
+		return false, err
+	}
+	trustMask := net.CIDRMask(mask, 32)
+	agentNet := addr.Mask(trustMask)
+	return agentNet.Equal(trustNet), nil
 }

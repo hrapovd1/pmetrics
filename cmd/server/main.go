@@ -63,6 +63,7 @@ func main() {
 	go handlerStorage.Storing(ctx, &wg, logger, serverConf.StoreInterval, serverConf.IsRestore)
 
 	router := chi.NewRouter()
+	router.Use(handlerMetrics.CheckAgentNetMiddle)
 	router.Use(handlerMetrics.DecryptMiddle)
 	router.Use(handlerMetrics.GzipMiddle)
 	router.Get("/", handlerMetrics.GetAllHandler)

@@ -316,3 +316,38 @@ func Test_genSymmKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, length, len(result))
 }
+
+func Test_getLocalAddr(t *testing.T) {
+	simpleHandl := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(""))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(simpleHandl))
+	defer ts.Close()
+	srvAddr := strings.Split(ts.URL, "//")[1]
+	t.Run("without addr in config", func(t *testing.T) {
+		conf := config.Config{
+			ServerAddress: srvAddr,
+		}
+		assert.Equal(t, "127.0.0.1", getLocalAddr(conf, log.Default()))
+
+	})
+	t.Run("with addr in config", func(t *testing.T) {
+		conf := config.Config{
+			TrustedSubnet: "192.168.1.1",
+		}
+		assert.Equal(t, "192.168.1.1", getLocalAddr(conf, log.Default()))
+
+	})
+	t.Run("wrong server addr in config", func(t *testing.T) {
+		conf := config.Config{
+			ServerAddress: "127.0.01:80",
+		}
+		assert.Equal(t, "", getLocalAddr(conf, log.Default()))
+
+	})
+}
