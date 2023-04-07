@@ -351,7 +351,11 @@ func TestMetricsHandler_CheckAgentNetMiddle(t *testing.T) {
 
 		rec := httptest.NewRecorder()
 		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
-		assert.Equal(t, http.StatusForbidden, rec.Result().StatusCode)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, result.StatusCode)
 		assert.NotEqual(t, clientReq, req)
 	})
 	t.Run("wrong header", func(t *testing.T) {
@@ -365,7 +369,11 @@ func TestMetricsHandler_CheckAgentNetMiddle(t *testing.T) {
 
 		rec := httptest.NewRecorder()
 		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
-		assert.Equal(t, http.StatusForbidden, rec.Result().StatusCode)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, result.StatusCode)
 		assert.NotEqual(t, clientReq, req)
 	})
 	t.Run("without trusted subnet", func(t *testing.T) {
