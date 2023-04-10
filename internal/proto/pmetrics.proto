@@ -4,20 +4,8 @@ package pmetrics;
 
 option go_package = "github.com/hrapovd1/pmetrics/internal/proto";
 
-message Metric {
-	string id = 1; // имя метрики
-	enum MType {
-		GAUGE = 0;
-		COUNTER = 1;
-	}
-	MType mtype = 2; // тип метрики
-	int64 delta = 3; // значение COUNTER метрики
-	double value = 4; // значение GAUGE метрики
-	string hash = 5; // значение хеш-функции
-}
-
 message MetricRequest {
-	Metric metric = 1;
+	bytes metric = 1; // метрика в JSON формате
 }
 
 message MetricResponse {
