@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package pmetrics;
+
+option go_package = "github.com/hrapovd1/pmetrics/internal/proto";
+
+message Metric {
+	string id = 1; // имя метрики
+	enum MType {
+		GAUGE = 0;
+		COUNTER = 1;
+	}
+	MType mtype = 2; // тип метрики
+	int64 delta = 3; // значение COUNTER метрики
+	double value = 4; // значение GAUGE метрики
+	string hash = 5; // значение хеш-функции
+}
+
+message MetricRequest {
+	Metric metric = 1;
+}
+
+message MetricResponse {
+	string error = 1;
+}
+
+message EncMetric {
+	string data0 = 1; // зашифрованный сеансовый ключ
+	string data = 2; // зашифрованные данные
+}
+
+message EncMetricRequest {
+	EncMetric data = 1;
+}
+
+service Metrics {
+	rpc ReportMetric(MetricRequest) returns (MetricResponse);
+	rpc ReportEncMetric(EncMetricRequest) returns (MetricResponse);
+
+	rpc ReportMetrics(stream MetricRequest) returns (MetricResponse);
+	rpc ReportEncMetrics(stream EncMetricRequest) returns (MetricResponse);
+}
