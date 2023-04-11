@@ -207,7 +207,7 @@ func DecryptData(data string, symm []byte) ([]byte, error) {
 	}
 	nonceSize := gcmDecrypt.NonceSize()
 	if len(encJSON) < nonceSize {
-		return nil, err
+		return nil, errors.New("len(encJSON) < nonceSize")
 	}
 	nonce, encDataJSON := encJSON[:nonceSize], encJSON[nonceSize:]
 	return gcmDecrypt.Open(nil, nonce, encDataJSON, nil)
