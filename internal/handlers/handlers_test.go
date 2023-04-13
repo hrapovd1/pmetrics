@@ -12,10 +12,51 @@ import (
 	"testing"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
+	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
+	"github.com/hrapovd1/pmetrics/internal/filestorage"
 	"github.com/hrapovd1/pmetrics/internal/storage"
+	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewMetricsHandler(t *testing.T) {
+	tmpFile, _ := os.CreateTemp("", "*.json")
+	defer os.Remove(tmpFile.Name())
+	tests := []struct {
+		name string
+		conf config.Config
+		stor types.Repository
+	}{
+		{
+			name: "mem only",
+			conf: config.Config{StoreFile: "", DatabaseDSN: ""},
+			stor: &storage.MemStorage{},
+		},
+		{
+			name: "file storage",
+			conf: config.Config{StoreFile: tmpFile.Name(), DatabaseDSN: ""},
+			stor: &filestorage.FileStorage{},
+		},
+		{
+			name: "db storage",
+			conf: config.Config{StoreFile: "", DatabaseDSN: "postgres"},
+			stor: &dbstorage.DBStorage{},
+		},
+		{
+			name: "all types storage",
+			conf: config.Config{StoreFile: tmpFile.Name(), DatabaseDSN: "postgres"},
+			stor: &dbstorage.DBStorage{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ms := NewMetricsHandler(test.conf, log.Default())
+			assert.IsType(t, test.stor, ms.Storage)
+		})
+	}
+}
 
 func TestMetricsHandler_GaugeHandler(t *testing.T) {
 	tests := []struct {
@@ -62,6 +103,15 @@ func TestMetricsHandler_GaugeHandler(t *testing.T) {
 			metric:      "Alloc",
 			want:        float64(0.0),
 			statusCode:  http.StatusBadRequest,
+		},
+		{
+			name:        "Wrong URL len",
+			path:        "/update/gauge/Alloc",
+			method:      http.MethodPost,
+			contentType: "text/plain",
+			metric:      "Alloc",
+			want:        float64(0.0),
+			statusCode:  http.StatusNotFound,
 		},
 	}
 
@@ -139,6 +189,14 @@ func TestMetricsHandler_CounterHandler(t *testing.T) {
 			contentType: "text/plain",
 			want:        int64(1),
 			statusCode:  http.StatusBadRequest,
+		},
+		{
+			name:        "Wrong URL len",
+			path:        "/update/counter/PollCount",
+			method:      http.MethodPost,
+			contentType: "text/plain",
+			want:        int64(1),
+			statusCode:  http.StatusNotFound,
 		},
 	}
 
@@ -271,7 +329,25 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 			want:     "-3.1",
 		},
 		{
+			name:     "Wrong metric",
+			positive: false,
+			url:      "/value/gage/",
+			want:     "-3.1",
+		},
+		{
 			name:     "Wrong url",
+			positive: false,
+			url:      "/value/gauge/",
+			want:     "-3.1",
+		},
+		{
+			name:     "Wrong url len",
+			positive: false,
+			url:      "/value",
+			want:     "-3.1",
+		},
+		{
+			name:     "Wrong method",
 			positive: false,
 			url:      "/value/gauge/",
 			want:     "-3.1",
@@ -282,7 +358,13 @@ func TestMetricsHandler_GetMetricHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			reqst := httptest.NewRequest(http.MethodGet, test.url, nil)
+			var reqst *http.Request
+			if strings.Contains(test.name, "method") {
+				reqst = httptest.NewRequest(http.MethodPost, test.url, nil)
+
+			} else {
+				reqst = httptest.NewRequest(http.MethodGet, test.url, nil)
+			}
 			// qeury server
 			hndl.ServeHTTP(rec, reqst)
 			result := rec.Result()

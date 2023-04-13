@@ -103,16 +103,18 @@ func Test_pollMetrics(t *testing.T) {
 
 func Test_metricToJSON(t *testing.T) {
 	tests := []struct {
-		name  string
-		key   string
-		value interface{}
-		want  []byte
+		name    string
+		key     string
+		value   interface{}
+		signKey string
+		want    []byte
 	}{
 		{
-			name:  "Check counter",
-			key:   "M1",
-			value: counter(345),
-			want:  []byte(`{"id":"M1","type":"counter","delta":345}`),
+			name:    "Check counter",
+			key:     "M1",
+			value:   counter(345),
+			signKey: "1234rewq",
+			want:    []byte(`{"id":"M1","type":"counter","delta":345,"hash":"535108d5fdfecf33c6af232a071c9e8e6c769c049c40d42317f130a78a7dd04d"}`),
 		},
 		{
 			name:  "Check gauge",
@@ -120,10 +122,17 @@ func Test_metricToJSON(t *testing.T) {
 			value: gauge(34.5),
 			want:  []byte(`{"id":"M2","type":"gauge","value":34.5}`),
 		},
+		{
+			name:    "Check sign",
+			key:     "M3",
+			value:   gauge(3.45),
+			signKey: "1234rewq",
+			want:    []byte(`{"id":"M3","type":"gauge","value":3.45,"hash":"151bf36a64705782ced1f2e7fc9f2feda8a11b6e669b90ca4f24d3f3218e2e9b"}`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := metricToJSON(tt.key, tt.value, "")
+			got, err := metricToJSON(tt.key, tt.value, tt.signKey)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -148,11 +157,30 @@ eS4bI4nmheWxgw0t2J74Tc+juSo7vpXyqU/PUUKjPmIAIPlJWaETSTihl6P6v6ob
 1foZVm9HaA3+uwVgGq2nh60CAwEAAQ==
 -----END PUBLIC KEY-----`)
 	require.NoError(t, err)
-
-	key, err := getPubKey(tmpFile.Name(), &log.Logger{})
+	tmpFile1, _ := os.CreateTemp("", "*key.pem")
+	defer os.Remove(tmpFile1.Name())
+	_, err = tmpFile1.WriteString(`-----BEGIN KEY-----
+-----END PUBLIC KEY-----`)
 	require.NoError(t, err)
-	assert.NotNil(t, key)
-	assert.Equal(t, 512, key.Size())
+
+	t.Run("good", func(t *testing.T) {
+		key, err := getPubKey(tmpFile.Name(), &log.Logger{})
+		require.NoError(t, err)
+		assert.NotNil(t, key)
+		assert.Equal(t, 512, key.Size())
+
+	})
+	t.Run("bad", func(t *testing.T) {
+		_, err := getPubKey("/tmp/key", &log.Logger{})
+		assert.Error(t, err)
+
+	})
+	t.Run("bad key file", func(t *testing.T) {
+		key, err := getPubKey(tmpFile1.Name(), &log.Logger{})
+		require.Error(t, err)
+		assert.Nil(t, key)
+
+	})
 }
 
 func Test_dataToEnc(t *testing.T) {

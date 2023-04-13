@@ -95,6 +95,8 @@ func TestMetricsHandler_GzipMiddle(t *testing.T) {
 
 func TestMetricsHandler_DecryptMiddle(t *testing.T) {
 	encyptBody := `{"data0":"EzzCAxNQHdI0ZEvSee8Og3ODT1tdMu9THUpHpZtnnFjklrkKMZ+858YlsJJr6mw59BtW9sD6XuPICpCNsK92zaYVE2GLrNHGSKxLJLgi+HnkLlcjA0FOIExCU/RPOQu+fgFMWIrSk6+yodawNtb6t9jYy7L7bm6AMwixUZvVKq13Oq3Qn3I3WRzoBWxZ2XxfTPGX1OMWtkCEaSWRnMKidHlqmyE469YxWbVE8fuCZEvfGfRqTBJ/Hn+fwE6IaNR16BZNsvymQYC6H+/ZudFxFi0AP7DttYOGkjF1hK5vJq9mEfXk6BdTfs9+CTwmTrg2fr9YbYgBNFsCoknvuxvViZTejF3ka/J4B0BBMAyjBUx1U+3aOiEQkHtTkO5PzCIiuCshA+du0XMcSvOOIuZvC56LRLCOF1DyLs9mR0V0vmHRykT/KDF32+N5EllS324aK4rssoR8AwVPWKIaNQonM6sPK3PxOAJVjY4vVl6xPXG2GOw2oMjMdH84yurw3IA06pllC46U3Z6okjxC/3dEK29Otji9xj4SD7b4Q1So5qRGsYKpgwKhZcdgwLbE8K7o+Wc2DnzEi+NvppsyJuV7D81jlND9Vb2m7vV3/jvkRcjXrHC7QQLGcAPd8KyGrGU4LDZVls7ngXy/RCnY2mTjF7iyWP5/BcjiNZlTPZVrhnI=","data1":"DpNSK2X+M0E0qPpX/w3iSOAFRVpM+H3SmvXwKE7+uOkkPSUh0EZc4iCjF7fZHj8LoPFFmROPvAn1jW9eAfapIyniCGbf7CVgNbFlq88E+hDLz80LZvxZFhwEU3NJxOyPZ5sjt/cvXcFujdwTxkMO1RXKyjE="}`
+	badEncyptBody1 := `{"data0":"EzzCdMu9THUpHpZtnnFjklrkKMZ+858YlsJJr6mw59BtW9sD6XuPICpCNsK92zaYVE2GLrNHGSKxLJLgi+HnkLlcjA0FOIExCU/RPOQu+fgFMWIrSk6+yodawNtb6t9jYy7L7bm6AMwixUZvVKq13Oq3Qn3I3WRzoBWxZ2XxfTPGX1OMWtkCEaSWRnMKidHlqmyE469YxWbVE8fuCZEvfGfRqTBJ/Hn+fwE6IaNR16BZNsvymQYC6H+/ZudFxFi0AP7DttYOGkjF1hK5vJq9mEfXk6BdTfs9+CTwmTrg2fr9YbYgBNFsCoknvuxvViZTejF3ka/J4B0BBMAyjBUx1U+3aOiEQkHtTkO5PzCIiuCshA+du0XMcSvOOIuZvC56LRLCOF1DyLs9mR0V0vmHRykT/KDF32+N5EllS324aK4rssoR8AwVPWKIaNQonM6sPK3PxOAJVjY4vVl6xPXG2GOw2oMjMdH84yurw3IA06pllC46U3Z6okjxC/3dEK29Otji9xj4SD7b4Q1So5qRGsYKpgwKhZcdgwLbE8K7o+Wc2DnzEi+NvppsyJuV7D81jlND9Vb2m7vV3/jvkRcjXrHC7QQLGcAPd8KyGrGU4LDZVls7ngXy/RCnY2mTjF7iyWP5/BcjiNZlTPZVrhnI=","data1":"DpNSK2X+M0E0qPpX/w3iSOAFRVpM+H3SmvXwKE7+uOkkPSUh0EZc4iCjF7fZHj8LoPFFmROPvAn1jW9eAfapIyniCGbf7CVgNbFlq88E+hDLz80LZvxZFhwEU3NJxOyPZ5sjt/cvXcFujdwTxkMO1RXKyjE="}`
+	badEncyptBody2 := `{"data0":"EzzCAxNQHdI0ZEvSee8Og3ODT1tdMu9THUpHpZtnnFjklrkKMZ+858YlsJJr6mw59BtW9sD6XuPICpCNsK92zaYVE2GLrNHGSKxLJLgi+HnkLlcjA0FOIExCU/RPOQu+fgFMWIrSk6+yodawNtb6t9jYy7L7bm6AMwixUZvVKq13Oq3Qn3I3WRzoBWxZ2XxfTPGX1OMWtkCEaSWRnMKidHlqmyE469YxWbVE8fuCZEvfGfRqTBJ/Hn+fwE6IaNR16BZNsvymQYC6H+/ZudFxFi0AP7DttYOGkjF1hK5vJq9mEfXk6BdTfs9+CTwmTrg2fr9YbYgBNFsCoknvuxvViZTejF3ka/J4B0BBMAyjBUx1U+3aOiEQkHtTkO5PzCIiuCshA+du0XMcSvOOIuZvC56LRLCOF1DyLs9mR0V0vmHRykT/KDF32+N5EllS324aK4rssoR8AwVPWKIaNQonM6sPK3PxOAJVjY4vVl6xPXG2GOw2oMjMdH84yurw3IA06pllC46U3Z6okjxC/3dEK29Otji9xj4SD7b4Q1So5qRGsYKpgwKhZcdgwLbE8K7o+Wc2DnzEi+NvppsyJuV7D81jlND9Vb2m7vV3/jvkRcjXrHC7QQLGcAPd8KyGrGU4LDZVls7ngXy/RCnY2mTjF7iyWP5/BcjiNZlTPZVrhnI=","data1":"DpNSK2X+M0E0qPpX/w3iSOAFRVpM+H3SmvXwKE7+uOkkPSUh0EZc4iCjF7fZHj8LoPFFmROPvAn1jW9eAfapIyniCGbf7CVgNbFlq88E+hDLz80LZvxZFhwEU3NJxOyPZ5sjt/cvX1RXKyjE="}`
 
 	tmpFile, _ := os.CreateTemp("", "*privkey.pem")
 	defer os.Remove(tmpFile.Name())
@@ -152,14 +154,6 @@ YwFAIVfOBFwuenyO1cI5dw5sW05PyeN3HxflJxV0Icg+jxnICfKyh3HSQXdL4Fwp
 -----END PRIVATE KEY-----`)
 	require.NoError(t, err)
 
-	mh := MetricsHandler{
-		Storage: storage.NewMemStorage(),
-		logger:  log.New(os.Stderr, "test", log.Default().Flags()),
-		Config: config.Config{
-			CryptoKey: tmpFile.Name(),
-		},
-	}
-
 	alloc1 := float64(-4.5)
 	count1 := int64(5)
 
@@ -191,7 +185,115 @@ YwFAIVfOBFwuenyO1cI5dw5sW05PyeN3HxflJxV0Icg+jxnICfKyh3HSQXdL4Fwp
 	}
 
 	t.Run("decrypt success", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config: config.Config{
+				CryptoKey: tmpFile.Name(),
+			},
+		}
+
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(encyptBody))
+		request.Header.Set("Encrypt-Type", "1")
+
+		rec := httptest.NewRecorder()
+		mh.DecryptMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, want, simpleData)
+	})
+	t.Run("without decrypt", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config: config.Config{
+				CryptoKey: tmpFile.Name(),
+			},
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(encyptBody))
+
+		rec := httptest.NewRecorder()
+		mh.DecryptMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, want, simpleData)
+
+	})
+	t.Run("empty key", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config:  config.Config{},
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(encyptBody))
+		request.Header.Set("Encrypt-Type", "1")
+
+		rec := httptest.NewRecorder()
+		mh.DecryptMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, want, simpleData)
+
+	})
+	t.Run("wrong key path", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config: config.Config{
+				CryptoKey: "/tmp/key23re",
+			},
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(encyptBody))
+		request.Header.Set("Encrypt-Type", "1")
+
+		rec := httptest.NewRecorder()
+		mh.DecryptMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, want, simpleData)
+
+	})
+	t.Run("bad encrypted key", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config: config.Config{
+				CryptoKey: tmpFile.Name(),
+			},
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(badEncyptBody1))
+		request.Header.Set("Encrypt-Type", "1")
+
+		rec := httptest.NewRecorder()
+		mh.DecryptMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, want, simpleData)
+	})
+	t.Run("bad encrypted data", func(t *testing.T) {
+		mh := MetricsHandler{
+			Storage: storage.NewMemStorage(),
+			logger:  log.New(os.Stderr, "test", log.Default().Flags()),
+			Config: config.Config{
+				CryptoKey: tmpFile.Name(),
+			},
+		}
+
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(badEncyptBody2))
 		request.Header.Set("Encrypt-Type", "1")
 
 		rec := httptest.NewRecorder()
@@ -283,5 +385,23 @@ func TestMetricsHandler_CheckAgentNetMiddle(t *testing.T) {
 		rec := httptest.NewRecorder()
 		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
 		assert.Equal(t, clientReq, req)
+	})
+	t.Run("wrong mask", func(t *testing.T) {
+		clientReq := []byte("test2")
+		mh := MetricsHandler{
+			Config: config.Config{TrustedSubnet: "192.168.1.0/2i"},
+			logger: log.Default(),
+		}
+		request := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(clientReq))
+		request.Header.Set("X-Real-IP", "192.168.0.1")
+
+		rec := httptest.NewRecorder()
+		mh.CheckAgentNetMiddle(http.HandlerFunc(simpleHandl)).ServeHTTP(rec, request)
+		result := rec.Result()
+		defer assert.Nil(t, result.Body.Close())
+		_, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, result.StatusCode)
+		assert.NotEqual(t, clientReq, req)
 	})
 }

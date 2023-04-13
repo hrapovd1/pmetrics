@@ -67,7 +67,7 @@ func main() {
 		log.Fatalf("when open port got error: %v\n", err)
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.StreamInterceptor(grpcServer.StreamInterceptor))
 	pb.RegisterMetricsServer(srv, grpcServer)
 
 	wg.Add(1)

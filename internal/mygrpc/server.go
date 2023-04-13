@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 
 	"github.com/hrapovd1/pmetrics/internal/config"
 	dbstorage "github.com/hrapovd1/pmetrics/internal/dbstrorage"
@@ -15,7 +16,9 @@ import (
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -26,6 +29,7 @@ type MetricsServer struct {
 	logger  *log.Logger
 }
 
+// NewMetricsServer - grpc MetricsServer constructor
 func NewMetricsServer(conf config.Config, logger *log.Logger) *MetricsServer {
 	ms := MetricsServer{conf: conf, logger: logger}
 	var fs *filestorage.FileStorage
@@ -66,7 +70,7 @@ func NewMetricsServer(conf config.Config, logger *log.Logger) *MetricsServer {
 	return &ms
 }
 
-// ReportMetric write metric in Repository
+// ReportMetric - unary server metric for unencrypted data
 func (ms *MetricsServer) ReportMetric(c context.Context, r *pb.MetricRequest) (*pb.MetricResponse, error) {
 	if err := ms.writeMetric(c, r.Metric); err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
@@ -74,6 +78,7 @@ func (ms *MetricsServer) ReportMetric(c context.Context, r *pb.MetricRequest) (*
 	return &pb.MetricResponse{}, nil
 }
 
+// ReportEncMetric - unary server metric for encrypted data
 func (ms *MetricsServer) ReportEncMetric(c context.Context, r *pb.EncMetricRequest) (*pb.MetricResponse, error) {
 	if ms.conf.CryptoKey == "" {
 		ms.logger.Print("got encrypted request, but CryptoKey wasn't provided")
@@ -89,11 +94,13 @@ func (ms *MetricsServer) ReportEncMetric(c context.Context, r *pb.EncMetricReque
 	symmKey, err := usecase.DecryptKey(r.Data.Data0, key)
 	if err != nil {
 		ms.logger.Printf("when DecryptData got error: %v", err)
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	dataJSON, err := usecase.DecryptData(r.Data.Data, symmKey)
 	if err != nil {
 		ms.logger.Printf("when DecryptData got error: %v", err)
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if err := ms.writeMetric(c, dataJSON); err != nil {
 		return nil, status.Errorf(codes.Internal, err.Error())
@@ -101,6 +108,7 @@ func (ms *MetricsServer) ReportEncMetric(c context.Context, r *pb.EncMetricReque
 	return &pb.MetricResponse{}, nil
 }
 
+// ReportMetrics - stream server method for unencrypted data
 func (ms *MetricsServer) ReportMetrics(strm pb.Metrics_ReportMetricsServer) error {
 	for {
 		select {
@@ -116,12 +124,14 @@ func (ms *MetricsServer) ReportMetrics(strm pb.Metrics_ReportMetricsServer) erro
 			}
 
 			if err := ms.writeMetric(strm.Context(), grpcMetric.Metric); err != nil {
+				ms.logger.Printf("when writeMetric got error: %v\n", err)
 				return err
 			}
 		}
 	}
 }
 
+// ReportEncMetrics - stream server method for encrypted data
 func (ms *MetricsServer) ReportEncMetrics(strm pb.Metrics_ReportEncMetricsServer) error {
 	if ms.conf.CryptoKey == "" {
 		ms.logger.Print("got encrypted request, but CryptoKey wasn't provided")
@@ -164,6 +174,40 @@ func (ms *MetricsServer) ReportEncMetrics(strm pb.Metrics_ReportEncMetricsServer
 	}
 }
 
+// StreamInterceptor - check metadata value X-Real-IP from agent
+func (ms *MetricsServer) StreamInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	md, ok := metadata.FromIncomingContext(stream.Context())
+	if ok {
+		values := md.Get("X-Real-IP")
+		if len(values) > 0 {
+			if ms.isTrustedAddr(values[0]) {
+				return handler(srv, stream)
+			}
+			ms.logger.Printf("got untrusted request from: %v\n", values)
+			return status.Error(codes.PermissionDenied, "untrusted agent")
+		}
+	}
+	return status.Error(codes.PermissionDenied, "untrusted agent")
+}
+
+// isTrustedAddr - check agent address value
+func (ms *MetricsServer) isTrustedAddr(addr string) bool {
+	if ms.conf.TrustedSubnet == "" {
+		return true
+	}
+	agentAddr := net.ParseIP(addr)
+	if agentAddr == nil {
+		return false
+	}
+	allow, err := usecase.CheckAddr(agentAddr, ms.conf.TrustedSubnet)
+	if err != nil {
+		ms.logger.Printf("when CheckAddr got err: %v\n", err)
+		return false
+	}
+	return allow
+}
+
+// writeMetric - write metric in storage and check hash sign
 func (ms *MetricsServer) writeMetric(ctx context.Context, data []byte) error {
 	var metric types.Metric
 	if err := json.Unmarshal(data, &metric); err != nil {
