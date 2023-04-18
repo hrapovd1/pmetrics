@@ -12,6 +12,10 @@ import (
 )
 
 func TestNewAgentConf(t *testing.T) {
+	tmpFile, _ := os.CreateTemp("", "*conf.json")
+	defer os.Remove(tmpFile.Name())
+	_, err := tmpFile.WriteString(`{"}`)
+	require.NoError(t, err)
 	tests := []struct {
 		name   string
 		fields Config
@@ -39,20 +43,138 @@ func TestNewAgentConf(t *testing.T) {
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
 					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "cfg from flags",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          true,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "bad file config",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          false,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "bad flag config",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          true,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewAgentConf(Flags{})
-			require.NoError(t, err)
-			assert.Equal(t, tt.fields, *cfg)
-		})
+		if strings.Contains(tt.name, "bad file") {
+			t.Run(tt.name, func(t *testing.T) {
+				defer os.Unsetenv("CONFIG")
+				os.Setenv("CONFIG", tmpFile.Name())
+				cfg, err := NewAgentConf(Flags{})
+				require.Error(t, err)
+				assert.Nil(t, cfg)
+			})
+		} else if strings.Contains(tt.name, "bad flag") {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewAgentConf(Flags{configFile: tmpFile.Name()})
+				require.Error(t, err)
+				assert.Nil(t, cfg)
+			})
+		} else if strings.Contains(tt.name, "cfg from") {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewAgentConf(Flags{
+					pollInterval:   "2s",
+					reportInterval: "10s",
+					address:        "localhost:8080",
+					storeInterval:  "0s",
+					storeFile:      "",
+					restore:        false,
+					dbDSN:          "",
+					cryptoKey:      "",
+					key:            "",
+				})
+				require.NoError(t, err)
+				assert.Equal(t, tt.fields, *cfg)
+			})
+		} else {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewAgentConf(Flags{})
+				require.NoError(t, err)
+				assert.Equal(t, tt.fields, *cfg)
+			})
+		}
 	}
 }
 
 func TestNewServerConf(t *testing.T) {
+	tmpFile, _ := os.CreateTemp("", "*conf.json")
+	defer os.Remove(tmpFile.Name())
+	_, err := tmpFile.WriteString(`{"}`)
+	require.NoError(t, err)
 	tests := []struct {
 		name   string
 		fields Config
@@ -79,16 +201,130 @@ func TestNewServerConf(t *testing.T) {
 					"STORE_FILE":      true,
 					"STORE_INTERVAL":  true,
 					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "cfg from flags",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          true,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "bad file config",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          false,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
+				},
+			},
+		},
+		{
+			name: "bad flag config",
+			fields: Config{
+				PollInterval:   2 * time.Second,
+				ReportInterval: 10 * time.Second,
+				ServerAddress:  "localhost:8080",
+				StoreInterval:  0,
+				StoreFile:      "",
+				IsRestore:      false,
+				DatabaseDSN:    "",
+				CryptoKey:      "",
+				Key:            "",
+				tagsDefault: map[string]bool{
+					"ADDRESS":         true,
+					"CONFIG":          true,
+					"CRYPTO_KEY":      true,
+					"KEY":             true,
+					"POLL_INTERVAL":   true,
+					"REPORT_INTERVAL": true,
+					"RESTORE":         true,
+					"STORE_FILE":      true,
+					"STORE_INTERVAL":  true,
+					"DATABASE_DSN":    true,
+					"TRUSTED_SUBNET":  true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := NewServerConf(Flags{})
-			require.NoError(t, err)
-			assert.Equal(t, tt.fields, *cfg)
-		})
+		if strings.Contains(tt.name, "bad file") {
+			t.Run(tt.name, func(t *testing.T) {
+				defer os.Unsetenv("CONFIG")
+				os.Setenv("CONFIG", tmpFile.Name())
+				cfg, err := NewServerConf(Flags{})
+				require.Error(t, err)
+				assert.Nil(t, cfg)
+			})
+		} else if strings.Contains(tt.name, "bad flag") {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewServerConf(Flags{configFile: tmpFile.Name()})
+				require.Error(t, err)
+				assert.Nil(t, cfg)
+			})
+		} else if strings.Contains(tt.name, "cfg from") {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewAgentConf(Flags{
+					pollInterval:   "2s",
+					reportInterval: "10s",
+					address:        "localhost:8080",
+					storeInterval:  "0s",
+					storeFile:      "",
+					restore:        false,
+					dbDSN:          "",
+					cryptoKey:      "",
+					key:            "",
+				})
+				require.NoError(t, err)
+				assert.Equal(t, tt.fields, *cfg)
+			})
+		} else {
+			t.Run(tt.name, func(t *testing.T) {
+				cfg, err := NewServerConf(Flags{})
+				require.NoError(t, err)
+				assert.Equal(t, tt.fields, *cfg)
+			})
+		}
 	}
 }
 
@@ -201,10 +437,15 @@ func TestConfig_setConfigFromFile(t *testing.T) {
 		StoreFile:     "/path/to/file.db",
 	}
 
-	conf := Config{}
-	require.NoError(t, conf.setConfigFromFile(tmpFile.Name()))
-	assert.Equal(t, want, conf)
-
+	t.Run("good", func(t *testing.T) {
+		conf := Config{}
+		require.NoError(t, conf.setConfigFromFile(tmpFile.Name()))
+		assert.Equal(t, want, conf)
+	})
+	t.Run("bad", func(t *testing.T) {
+		conf := Config{}
+		require.Error(t, conf.setConfigFromFile("/tmp/ke79685"))
+	})
 }
 
 func TestConfig_UnmarshalJSON(t *testing.T) {
@@ -223,6 +464,21 @@ func TestConfig_UnmarshalJSON(t *testing.T) {
 			name:     "wrong data",
 			positive: false,
 			data:     []byte(`{"poll_interval: "2s", "report_interval": "5s", "store_interval": "7s"}`),
+		},
+		{
+			name:     "wrong poll_interval",
+			positive: false,
+			data:     []byte(`{"poll_interval": "2", "report_interval": "5s", "store_interval": "7s"}`),
+		},
+		{
+			name:     "wrong report_interval",
+			positive: false,
+			data:     []byte(`{"poll_interval": "2s", "report_interval": "5", "store_interval": "7s"}`),
+		},
+		{
+			name:     "wrong store_interval",
+			positive: false,
+			data:     []byte(`{"poll_interval": "2s", "report_interval": "5s", "store_interval": "7"}`),
 		},
 	}
 	for _, test := range tests {
@@ -254,6 +510,32 @@ func ExampleGetAgentFlags() {
 
 	fmt.Println(agentConfig)
 }
+
+func TestGetServerFlags(t *testing.T) {
+	fmt.Printf("before: %v\n", os.Args)
+	flags := GetServerFlags()
+	fmt.Printf("after: %v\n", os.Args)
+	assert.Equal(t,
+		Flags{
+			address: "", pollInterval: "", reportInterval: "",
+			restore: true, storeFile: "", storeInterval: "",
+			key: "", cryptoKey: "", dbDSN: "", configFile: "",
+			trustedSubnet: ""},
+		flags,
+	)
+}
+
+// func TestGetAgentFlags(t *testing.T) {
+// 	flags := GetAgentFlags()
+// 	assert.Equal(t,
+// 		Flags{
+// 			address: "", pollInterval: "", reportInterval: "",
+// 			restore: false, storeFile: "", storeInterval: "",
+// 			key: "", cryptoKey: "", dbDSN: "", configFile: "",
+// 			trustedSubnet: ""},
+// 		flags,
+// 	)
+// }
 
 func ExampleGetServerFlags() {
 	serverFlags := GetServerFlags()

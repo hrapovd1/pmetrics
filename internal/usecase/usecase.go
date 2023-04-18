@@ -3,8 +3,20 @@ package usecase
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
+	"net"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/storage"
 	"github.com/hrapovd1/pmetrics/internal/types"
@@ -127,4 +139,88 @@ func GetTableMetrics(ctx context.Context, repo types.Repository) map[string]stri
 		}
 	}
 	return outTable
+}
+
+func GetPrivKey(fname string, logger *log.Logger) (*rsa.PrivateKey, error) {
+	// read private key from file
+	keyFile, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := keyFile.Close(); err != nil {
+			logger.Println(err)
+		}
+	}()
+	pemPrivKey := make([]byte, 4*1024)
+	n, err := keyFile.Read(pemPrivKey)
+	if err != nil {
+		return nil, err
+	}
+	pemPrivKey = pemPrivKey[:n]
+
+	// decode private key from pem format
+	privKey, _ := pem.Decode(pemPrivKey)
+	if privKey == nil || privKey.Type != "PRIVATE KEY" {
+		return nil, errors.New("not found PRIVATE KEY in file " + fname)
+	}
+	// parse private key from byte slice
+	rsaPrivKey, err := x509.ParsePKCS8PrivateKey(privKey.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := rsaPrivKey.(*rsa.PrivateKey)
+	if !ok {
+		return key, errors.New("can't convert key to *rsa.PrivateKey")
+	}
+	return key, nil
+}
+
+func DecryptKey(kData string, privKey *rsa.PrivateKey) ([]byte, error) {
+	// Get encrypted primary data
+	encSymmKey, err := base64.StdEncoding.DecodeString(kData)
+	if err != nil {
+		return nil, err
+	}
+	// Decrypt primary data
+	// Decrypt symm key
+	symmKey, err := rsa.DecryptPKCS1v15(rand.Reader, privKey, encSymmKey)
+	if err != nil {
+		return nil, err
+	}
+	return symmKey, nil
+}
+
+func DecryptData(data string, symm []byte) ([]byte, error) {
+	encJSON, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+	// Decrypt metrics data
+	chpr, err := aes.NewCipher(symm)
+	if err != nil {
+		return nil, err
+	}
+	gcmDecrypt, err := cipher.NewGCM(chpr)
+	if err != nil {
+		return nil, err
+	}
+	nonceSize := gcmDecrypt.NonceSize()
+	if len(encJSON) < nonceSize {
+		return nil, errors.New("len(encJSON) < nonceSize")
+	}
+	nonce, encDataJSON := encJSON[:nonceSize], encJSON[nonceSize:]
+	return gcmDecrypt.Open(nil, nonce, encDataJSON, nil)
+}
+
+func CheckAddr(addr net.IP, trustSubNet string) (bool, error) {
+	subNet := strings.Split(trustSubNet, "/")
+	trustNet := net.ParseIP(subNet[0])
+	mask, err := strconv.Atoi(subNet[1])
+	if err != nil {
+		return false, err
+	}
+	trustMask := net.CIDRMask(mask, 32)
+	agentNet := addr.Mask(trustMask)
+	return agentNet.Equal(trustNet), nil
 }

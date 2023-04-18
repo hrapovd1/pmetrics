@@ -3,18 +3,18 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/hrapovd1/pmetrics/internal/config"
-	"github.com/hrapovd1/pmetrics/internal/handlers"
+	"github.com/hrapovd1/pmetrics/internal/mygrpc"
+	pb "github.com/hrapovd1/pmetrics/internal/proto"
 	"github.com/hrapovd1/pmetrics/internal/types"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -46,10 +46,10 @@ func main() {
 	logger.Printf("\tBuild commit: %s\n", buildCommit)
 	logger.Println("Server start on ", serverConf.ServerAddress)
 
-	handlerMetrics := handlers.NewMetricsHandler(*serverConf, logger)
-	handlerStorage := handlerMetrics.Storage.(types.Storager)
+	grpcServer := mygrpc.NewMetricsServer(*serverConf, logger)
+	srvStorage := grpcServer.Storage.(types.Storager)
 	defer func() {
-		if err := handlerStorage.Close(); err != nil {
+		if err := srvStorage.Close(); err != nil {
 			logger.Print(err)
 		}
 	}()
@@ -60,43 +60,26 @@ func main() {
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
-	go handlerStorage.Storing(ctx, &wg, logger, serverConf.StoreInterval, serverConf.IsRestore)
+	go srvStorage.Storing(ctx, &wg, logger, serverConf.StoreInterval, serverConf.IsRestore)
 
-	router := chi.NewRouter()
-	router.Use(handlerMetrics.DecryptMiddle)
-	router.Use(handlerMetrics.GzipMiddle)
-	router.Get("/", handlerMetrics.GetAllHandler)
-	router.Get("/value/*", handlerMetrics.GetMetricHandler)
-	router.Get("/ping", handlerMetrics.PingDB)
-	router.Post("/value/", handlerMetrics.GetMetricJSONHandler)
-	router.Post("/updates/", handlerMetrics.UpdatesHandler)
-
-	update := chi.NewRouter()
-	update.Post("/gauge/*", handlerMetrics.GaugeHandler)
-	update.Post("/counter/*", handlerMetrics.CounterHandler)
-	update.Post("/", handlerMetrics.UpdateHandler)
-	update.Post("/*", handlers.NotImplementedHandler)
-
-	router.Mount("/update", update)
-	router.Mount("/debug", middleware.Profiler())
-
-	server := http.Server{
-		Addr:    serverConf.ServerAddress,
-		Handler: router,
+	listen, err := net.Listen("tcp", serverConf.ServerAddress)
+	if err != nil {
+		log.Fatalf("when open port got error: %v\n", err)
 	}
 
+	srv := grpc.NewServer(grpc.StreamInterceptor(grpcServer.StreamInterceptor))
+	pb.RegisterMetricsServer(srv, grpcServer)
+
 	wg.Add(1)
-	go func(c context.Context, w *sync.WaitGroup, s *http.Server, l *log.Logger) {
+	go func(c context.Context, w *sync.WaitGroup, s *grpc.Server, l *log.Logger) {
 		defer wg.Done()
 		<-c.Done()
 		l.Println("got signal to stop")
-		if err := s.Shutdown(c); err != nil {
-			l.Println(err)
-		}
+		s.GracefulStop()
 
-	}(ctx, &wg, &server, logger)
+	}(ctx, &wg, srv, logger)
 
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+	if err := srv.Serve(listen); err != http.ErrServerClosed {
 		logger.Fatal(err)
 	}
 

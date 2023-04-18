@@ -5,22 +5,14 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
-	"errors"
 	"io"
-	"log"
+	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/hrapovd1/pmetrics/internal/types"
+	"github.com/hrapovd1/pmetrics/internal/usecase"
 )
 
 // тип http ответа со сжатием
@@ -78,7 +70,7 @@ func (mh *MetricsHandler) DecryptMiddle(next http.Handler) http.Handler {
 			http.Error(w, "Server doesn't support encryption", http.StatusInternalServerError)
 			return
 		}
-		key, err := getPrivKey(mh.Config.CryptoKey, mh.logger)
+		key, err := usecase.GetPrivKey(mh.Config.CryptoKey, mh.logger)
 		if err != nil {
 			mh.logger.Printf("when open key file %s, got error: %v", mh.Config.CryptoKey, err)
 			http.Error(w, "Server doesn't support encryption", http.StatusInternalServerError)
@@ -104,7 +96,13 @@ func (mh *MetricsHandler) DecryptMiddle(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		dataJSON, err := decryptData(encData, key)
+		symmKey, err := usecase.DecryptKey(encData.Data0, key)
+		if err != nil {
+			mh.logger.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		dataJSON, err := usecase.DecryptData(encData.Data, symmKey)
 		if err != nil {
 			mh.logger.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -117,70 +115,31 @@ func (mh *MetricsHandler) DecryptMiddle(next http.Handler) http.Handler {
 	})
 }
 
-func getPrivKey(fname string, logger *log.Logger) (*rsa.PrivateKey, error) {
-	// read private key from file
-	keyFile, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := keyFile.Close(); err != nil {
-			logger.Println(err)
+func (mh *MetricsHandler) CheckAgentNetMiddle(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case mh.Config.TrustedSubnet == "":
+			next.ServeHTTP(w, r)
+			return
+		case r.Header.Get("X-Real-IP") != "":
+			agentAddr := net.ParseIP(r.Header.Get("X-Real-IP"))
+			if agentAddr == nil {
+				break
+			}
+			allow, err := usecase.CheckAddr(agentAddr, mh.Config.TrustedSubnet)
+			if err != nil {
+				mh.logger.Printf("got error when check agent address: %v\n", err)
+				break
+			}
+			if !allow {
+				mh.logger.Printf("Try to connect from untusted address: %v\n", agentAddr.String())
+				break
+			}
+			next.ServeHTTP(w, r)
+			return
+		default:
+			mh.logger.Println("Try to connect without X-Real-IP header")
 		}
-	}()
-	pemPrivKey := make([]byte, 4*1024)
-	n, err := keyFile.Read(pemPrivKey)
-	if err != nil {
-		return nil, err
-	}
-	pemPrivKey = pemPrivKey[:n]
-
-	// decode private key from pem format
-	privKey, _ := pem.Decode(pemPrivKey)
-	if privKey == nil || privKey.Type != "PRIVATE KEY" {
-		return nil, errors.New("not found PRIVATE KEY in file " + fname)
-	}
-	// parse private key from byte slice
-	rsaPrivKey, err := x509.ParsePKCS8PrivateKey(privKey.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	key, ok := rsaPrivKey.(*rsa.PrivateKey)
-	if !ok {
-		return key, errors.New("can't convert key to *rsa.PrivateKey")
-	}
-	return key, nil
-}
-
-func decryptData(dData types.EncData, privKey *rsa.PrivateKey) ([]byte, error) {
-	// Get encrypted primary data
-	encSymmKey, err := base64.StdEncoding.DecodeString(dData.Data0)
-	if err != nil {
-		return nil, err
-	}
-	encJSON, err := base64.StdEncoding.DecodeString(dData.Data)
-	if err != nil {
-		return nil, err
-	}
-	// Decrypt primary data
-	// Decrypt symm key
-	symmKey, err := rsa.DecryptPKCS1v15(rand.Reader, privKey, encSymmKey)
-	if err != nil {
-		return nil, err
-	}
-	// Decrypt metrics data
-	chpr, err := aes.NewCipher(symmKey)
-	if err != nil {
-		return nil, err
-	}
-	gcmDecrypt, err := cipher.NewGCM(chpr)
-	if err != nil {
-		return nil, err
-	}
-	nonceSize := gcmDecrypt.NonceSize()
-	if len(encJSON) < nonceSize {
-		return nil, err
-	}
-	nonce, encDataJSON := encJSON[:nonceSize], encJSON[nonceSize:]
-	return gcmDecrypt.Open(nil, nonce, encDataJSON, nil)
+		http.Error(w, "Unknown agent forbidden", http.StatusForbidden)
+	})
 }

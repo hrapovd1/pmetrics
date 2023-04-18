@@ -19,24 +19,42 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 		name        string
 		data        string
 		contentType string
+		key         string
 		statusCode  int
 	}{
 		{
 			name:        "Alloc1",
 			data:        `{"id":"Alloc1","type":"gauge","value":-4.5}`,
 			contentType: "application/json",
+			key:         "",
 			statusCode:  http.StatusOK,
 		},
 		{
 			name:        "Count1",
 			data:        `{"id":"Count1","type":"counter","delta":5}`,
 			contentType: "application/json",
+			key:         "",
 			statusCode:  http.StatusOK,
 		},
 		{
 			name:        "Empty data",
 			data:        `{}`,
 			contentType: "application/json",
+			key:         "",
+			statusCode:  http.StatusBadRequest,
+		},
+		{
+			name:        "Bad data",
+			data:        `{"}`,
+			contentType: "application/json",
+			key:         "",
+			statusCode:  http.StatusInternalServerError,
+		},
+		{
+			name:        "Sign data",
+			data:        `{"id":"Count1","type":"counter","delta":5}`,
+			contentType: "application/json",
+			key:         "1234rewq",
 			statusCode:  http.StatusBadRequest,
 		},
 	}
@@ -47,6 +65,7 @@ func TestMetricsHandler_UpdateHandler(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		ms.Config.Key = test.key
 		reqst := httptest.NewRequest(http.MethodPost, "/update/", strings.NewReader(test.data))
 		reqst.Header.Set("Content-Type", test.contentType)
 		rec := httptest.NewRecorder()
@@ -73,23 +92,27 @@ func TestMetricsHandler_UpdatesHandler(t *testing.T) {
 		name        string
 		data        string
 		contentType string
+		key         string
 		statusCode  int
 	}{
 		{
 			name:        "Alloc",
 			data:        `[{"id":"Alloc1","type":"gauge","value":-4.5}]`,
+			key:         "1234rewq",
 			contentType: "application/json",
-			statusCode:  http.StatusOK,
+			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "Count1",
 			data:        `[{"id":"Count1","type":"counter","delta":5}]`,
+			key:         "",
 			contentType: "application/json",
 			statusCode:  http.StatusOK,
 		},
 		{
 			name:        "Empty data",
 			data:        `{}`,
+			key:         "",
 			contentType: "application/json",
 			statusCode:  http.StatusInternalServerError,
 		},
@@ -101,6 +124,7 @@ func TestMetricsHandler_UpdatesHandler(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		ms.Config.Key = test.key
 		reqst := httptest.NewRequest(http.MethodPost, "/updates/", strings.NewReader(test.data))
 		reqst.Header.Set("Content-Type", test.contentType)
 		rec := httptest.NewRecorder()
@@ -132,30 +156,42 @@ func TestMetricsHandler_GetMetricJSONHandler(t *testing.T) {
 		name        string
 		data        string
 		contentType string
+		key         string
 		statusCode  int
 	}{
 		{
 			name:        "PollCount",
 			data:        `{"id":"PollCount","type":"counter","delta":4}`,
 			contentType: "application/json",
+			key:         "",
 			statusCode:  http.StatusOK,
 		},
 		{
 			name:        "Sys",
-			data:        `{"id":"Sys","type":"gauge","value":0}`,
+			data:        `{"id":"Sys","type":"gauge","value":0,"hash":"4f289c7282738ac5473752e362b02d41c598f7424fff27e8f0563fea6a183ac9"}`,
 			contentType: "application/json",
+			key:         "1234rewq",
 			statusCode:  http.StatusOK,
 		},
 		{
-			name:        "Wrong data",
+			name:        "Empty data",
 			data:        `{}`,
 			contentType: "application/json",
+			key:         "",
 			statusCode:  http.StatusNotFound,
+		},
+		{
+			name:        "Wrong data",
+			data:        `{"}`,
+			contentType: "application/json",
+			key:         "",
+			statusCode:  http.StatusInternalServerError,
 		},
 	}
 	hndl := http.HandlerFunc(ms.GetMetricJSONHandler)
 
 	for _, test := range tests {
+		ms.Config.Key = test.key
 		t.Run(test.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			reqst := httptest.NewRequest(http.MethodPost, "/value/", strings.NewReader(test.data))

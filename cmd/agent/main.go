@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -22,12 +23,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/hrapovd1/pmetrics/internal/config"
+	pb "github.com/hrapovd1/pmetrics/internal/proto"
 	"github.com/hrapovd1/pmetrics/internal/types"
 	"github.com/hrapovd1/pmetrics/internal/usecase"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -53,7 +57,7 @@ func main() {
 		logger.Fatalln(err)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	nctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer stop()
 
 	metrics := mmetrics{
@@ -61,7 +65,17 @@ func main() {
 		mtrcs:       make(map[string]interface{}, 29),
 	}
 
-	httpClient := resty.New()
+	localAddr := getLocalAddr(*agentConf, logger)
+	conn, err := grpc.Dial(agentConf.ServerAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Fatalf("when grpc.Dial got error: %v\n", err)
+	}
+	defer conn.Close()
+
+	client := pb.NewMetricsClient(conn)
+
+	md := metadata.New(map[string]string{"X-Real-IP": localAddr})
+	ctx := metadata.NewOutgoingContext(nctx, md)
 
 	if buildVersion == "" {
 		buildVersion = "N/A"
@@ -85,25 +99,31 @@ func main() {
 	go pollMetrics(ctx, wg, &metrics, agentConf.PollInterval)
 	go pollHwMetrics(ctx, wg, &metrics, agentConf.PollInterval, logger)
 
-	go reportMetrics(ctx, wg, &metrics, *agentConf, httpClient, logger)
+	go reportMetrics(ctx, wg, &metrics, *agentConf, client, logger)
 
 	wg.Wait()
 }
 
-func reportMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, cfg config.Config, httpClnt *resty.Client, logger *log.Logger) {
-	metricURL := "http://" + cfg.ServerAddress + "/updates/"
-	var (
-		pubKey  *rsa.PublicKey
-		dataEnc []byte
-		err     error
-	)
+func reportMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, cfg config.Config, clnt pb.MetricsClient, logger *log.Logger) {
 	defer w.Done()
-	encrypt := false
+	var (
+		pubKey     *rsa.PublicKey
+		dataEnc    string
+		encDataKey string
+		err        error
+		stream     pb.Metrics_ReportMetricsClient
+		encrypt    = struct {
+			enc     bool
+			symmKey []byte
+			stream  pb.Metrics_ReportEncMetricsClient
+		}{enc: false}
+	)
+
 	if cfg.CryptoKey != "" {
 		if pubKey, err = getPubKey(cfg.CryptoKey, logger); err != nil {
 			logger.Fatalf("getPubKey got error: %v", err)
 		}
-		encrypt = true
+		encrypt.enc = true
 	}
 
 	reportTick := time.NewTicker(cfg.ReportInterval)
@@ -114,30 +134,76 @@ func reportMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, cf
 		case <-ctx.Done():
 			return
 		case <-reportTick.C:
-			metrics.mu.Lock()
-			data, err := metricsToJSON(metrics.mtrcs, cfg.Key)
-			metrics.mu.Unlock()
-			if err != nil {
-				logger.Println(err)
-			}
-
-			if encrypt {
-				dataEnc, err = dataToEncJSON(pubKey, data)
+			if encrypt.enc {
+				// prepare for transmition
+				encrypt.stream, err = clnt.ReportEncMetrics(ctx)
 				if err != nil {
 					logger.Println(err)
+					break
+				}
+				// gen symm key
+				encrypt.symmKey, err = genSymmKey(24)
+				if err != nil {
+					logger.Println(err)
+					break
+				}
+				encDataKey, err = symmKeyToEnc(pubKey, encrypt.symmKey)
+				if err != nil {
+					logger.Println(err)
+					break
+				}
+			} else {
+				stream, err = clnt.ReportMetrics(ctx)
+				if err != nil {
+					logger.Println(err)
+					break
 				}
 			}
 
-			restyClient := httpClnt.R().SetHeader("Content-Type", "application/json")
-			if encrypt {
-				restyClient.SetHeader("Encrypt-Type", "1").SetBody(dataEnc)
-			} else {
-				restyClient.SetBody(data)
+			// send metrics in stream
+			metrics.mu.Lock()
+			for mKey, mVal := range metrics.mtrcs {
+				data, err := metricToJSON(mKey, mVal, cfg.Key)
+				if err != nil {
+					logger.Println(err)
+				}
+				if encrypt.enc {
+					dataEnc, err = dataToEnc(encrypt.symmKey, data)
+					if err != nil {
+						logger.Println(err)
+						break
+					}
+					req := pb.EncMetricRequest{
+						Data: &pb.EncMetric{
+							Data0: encDataKey,
+							Data:  dataEnc,
+						},
+					}
+					if err := encrypt.stream.Send(&req); err != nil {
+						logger.Println(err)
+						break
+					}
+				} else {
+					req := pb.MetricRequest{
+						Metric: data,
+					}
+					if err := stream.Send(&req); err != nil {
+						logger.Println(err)
+						break
+					}
+				}
 			}
+			metrics.mu.Unlock()
 
-			_, err = restyClient.Post(metricURL)
-			if err != nil {
-				logger.Print("Error when sent metrics. ", err)
+			// close opened stream
+			if encrypt.enc {
+				if err := encrypt.stream.CloseSend(); err != nil {
+					logger.Printf("when close encrypt stream got err: %v", err)
+				}
+			} else {
+				if err := stream.CloseSend(); err != nil {
+					logger.Printf("when close stream got err: %v", err)
+				}
 			}
 		}
 	}
@@ -220,36 +286,31 @@ func pollHwMetrics(ctx context.Context, w *sync.WaitGroup, metrics *mmetrics, po
 	}
 }
 
-func metricsToJSON(mtrcs map[string]interface{}, key string) ([]byte, error) {
-	metrics := make([]types.Metric, 0)
-	for k, v := range mtrcs {
-		var value float64
-		var delta int64
-		data := types.Metric{ID: k}
-		switch val := v.(type) {
-		case gauge:
-			value = float64(val)
-			data.MType = "gauge"
-			data.Value = &value
-			if key != "" {
-				if err := usecase.SignData(&data, key); err != nil {
-					return nil, err
-				}
+func metricToJSON(mKey string, mValue interface{}, key string) ([]byte, error) {
+	var value float64
+	var delta int64
+	data := types.Metric{ID: mKey}
+	switch val := mValue.(type) {
+	case gauge:
+		value = float64(val)
+		data.MType = "gauge"
+		data.Value = &value
+		if key != "" {
+			if err := usecase.SignData(&data, key); err != nil {
+				return nil, err
 			}
-			metrics = append(metrics, data)
-		case counter:
-			delta = int64(val)
-			data.MType = "counter"
-			data.Delta = &delta
-			if key != "" {
-				if err := usecase.SignData(&data, key); err != nil {
-					return nil, err
-				}
+		}
+	case counter:
+		delta = int64(val)
+		data.MType = "counter"
+		data.Delta = &delta
+		if key != "" {
+			if err := usecase.SignData(&data, key); err != nil {
+				return nil, err
 			}
-			metrics = append(metrics, data)
 		}
 	}
-	return json.Marshal(metrics)
+	return json.Marshal(data)
 }
 
 func getPubKey(fname string, logger *log.Logger) (*rsa.PublicKey, error) {
@@ -287,40 +348,32 @@ func getPubKey(fname string, logger *log.Logger) (*rsa.PublicKey, error) {
 	return key, nil
 }
 
-func dataToEncJSON(key *rsa.PublicKey, data []byte) ([]byte, error) {
-	// gen symm key
-	symmKey, err := genSymmKey(24)
-	if err != nil {
-		return nil, err
-	}
-
+func symmKeyToEnc(key *rsa.PublicKey, symmKey []byte) (string, error) {
 	// encrypt symm key
 	keyEnc, err := rsa.EncryptPKCS1v15(crand.Reader, key, symmKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
+	return base64.StdEncoding.EncodeToString(keyEnc), nil
+}
+
+func dataToEnc(symmKey []byte, data []byte) (string, error) {
 	// encrypt data
 	cphr, err := aes.NewCipher(symmKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	gcm, err := cipher.NewGCM(cphr)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(crand.Reader, nonce); err != nil {
-		return nil, err
+		return "", err
 	}
 	dataEnc := gcm.Seal(nonce, nonce, data, nil)
 
-	// json marshal
-	return json.Marshal(
-		types.EncData{
-			Data0: base64.StdEncoding.EncodeToString(keyEnc),
-			Data:  base64.StdEncoding.EncodeToString(dataEnc),
-		},
-	)
+	return base64.StdEncoding.EncodeToString(dataEnc), nil
 }
 
 func genSymmKey(n int) ([]byte, error) {
@@ -330,4 +383,22 @@ func genSymmKey(n int) ([]byte, error) {
 		return out, err
 	}
 	return out, nil
+}
+
+func getLocalAddr(conf config.Config, logger *log.Logger) string {
+	confAddr := net.ParseIP(conf.TrustedSubnet)
+	if confAddr != nil {
+		return confAddr.String()
+	}
+	conn, err := net.Dial("tcp", conf.ServerAddress)
+	if err != nil {
+		logger.Printf("when try to dial server %v got error: %v\n", conf.ServerAddress, err)
+		return ""
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Printf("when close connection got error: %v\n", err)
+		}
+	}()
+	return conn.LocalAddr().(*net.TCPAddr).IP.String()
 }

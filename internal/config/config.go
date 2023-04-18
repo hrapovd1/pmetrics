@@ -27,6 +27,7 @@ type environ struct {
 	CryptoKey      string `env:"CRYPTO_KEY" envDefault:""`
 	DatabaseDSN    string `env:"DATABASE_DSN" envDefault:""`
 	ConfigFile     string `env:"CONFIG" envDefault:""`
+	TrustedSubnet  string `env:"TRUSTED_SUBNET" envDefault:""`
 }
 
 // Config тип итоговой конфигурации агента или сервера
@@ -40,6 +41,7 @@ type Config struct {
 	Key            string          `json:"key,omitempty"`
 	CryptoKey      string          `json:"crypto_key,omitempty"`
 	DatabaseDSN    string          `json:"database_dsn,omitempty"`
+	TrustedSubnet  string          `json:"trusted_subnet,omitempty"`
 	tagsDefault    map[string]bool `json:"-"`
 }
 
@@ -120,6 +122,16 @@ func NewAgentConf(flags Flags) (*Config, error) {
 	if flags.cryptoKey == "" && cfg.tagsDefault["CRYPTO_KEY"] && fileCfg.valueExists("CryptoKey") {
 		cfg.CryptoKey = fileCfg.CryptoKey
 	}
+	// Определяю доверенную подсеть для заголовка X-Real-IP
+	if cfg.tagsDefault["TRUSTED_SUBNET"] {
+		cfg.TrustedSubnet = flags.trustedSubnet
+	} else {
+		cfg.TrustedSubnet = envs.TrustedSubnet
+	}
+	if flags.trustedSubnet == "" && cfg.tagsDefault["TRUSTED_SUBNET"] && fileCfg.valueExists("TrustedSubnet") {
+		cfg.TrustedSubnet = fileCfg.TrustedSubnet
+	}
+
 	return &cfg, err
 }
 
@@ -217,6 +229,15 @@ func NewServerConf(flags Flags) (*Config, error) {
 	}
 	if flags.dbDSN == "" && cfg.tagsDefault["DATABASE_DSN"] && fileCfg.valueExists("DatabaseDSN") {
 		cfg.DatabaseDSN = fileCfg.DatabaseDSN
+	}
+	// Определяю доверенную подсеть
+	if cfg.tagsDefault["TRUSTED_SUBNET"] {
+		cfg.TrustedSubnet = flags.trustedSubnet
+	} else {
+		cfg.TrustedSubnet = envs.TrustedSubnet
+	}
+	if flags.trustedSubnet == "" && cfg.tagsDefault["TRUSTED_SUBNET"] && fileCfg.valueExists("TrustedSubnet") {
+		cfg.TrustedSubnet = fileCfg.TrustedSubnet
 	}
 
 	return &cfg, err
@@ -321,6 +342,7 @@ type Flags struct {
 	cryptoKey      string
 	dbDSN          string
 	configFile     string
+	trustedSubnet  string
 }
 
 // GetServerFlags - считывае флаги сервера
@@ -335,6 +357,7 @@ func GetServerFlags() Flags {
 	flag.StringVar(&flags.dbDSN, "d", "", "Database connect source, for example: postgres://username:password@localhost:5432/database_name")
 	flag.StringVar(&flags.configFile, "c", "", "(or -config) Path to config file in JSON format")
 	flag.StringVar(&flags.configFile, "config", "", "(or -c) Path to config file in JSON format")
+	flag.StringVar(&flags.trustedSubnet, "t", "", "Trusted subnet from agent is sending data, for example: 192.168.0.0/24")
 	flag.Parse()
 	return flags
 }
@@ -349,6 +372,7 @@ func GetAgentFlags() Flags {
 	flag.StringVar(&flags.cryptoKey, "crypto-key", "", "Path to file with public rsa key for encrypt agent's messages")
 	flag.StringVar(&flags.configFile, "c", "", "(or -config) Path to config file in JSON format")
 	flag.StringVar(&flags.configFile, "config", "", "(or -c) Path to config file in JSON format")
+	flag.StringVar(&flags.trustedSubnet, "t", "", "Local agent address for X-Real-IP header, for example: 192.168.0.2")
 	flag.Parse()
 	return flags
 }
